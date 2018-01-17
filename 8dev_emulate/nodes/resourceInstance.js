@@ -42,15 +42,15 @@ class ResourceInstance {
     return this.value;
   }
 
-  writeValue(value) {
-    if (this.permissions.indexOf('W') > -1) {
+  writeValue(value, force) {
+    if ( (this.permissions.indexOf('W') > -1) || force ) {
       this.value = value;
       return '2.04';
     }
     return '4.05';
   }
 
-  deleteResource() {
+  deleteResource(force) {
     if (this.permissions.indexOf('D') > -1) {
       return '2.02';
     }
@@ -62,9 +62,11 @@ class ResourceInstance {
       case RESOURCE_TYPE.NONE:
         return 0;
       case RESOURCE_TYPE.INTEGER:
-        if (this.getValue() < (2 ** 8)) {
+        if (this.getValue() === 0) {
+          return 0;
+        } else if (this.getValue() < (2 ** 7)) {
           return 1;
-        } else if (this.getValue() < (2 ** 16)) {
+        } else if (this.getValue() < (2 ** 15)) {
           return 2;
         }
         return 4;
@@ -115,7 +117,7 @@ class ResourceInstance {
   }
 
   getValueBytes() {
-    const value = this.getValue();
+    let value = this.getValue();
     let valueBuffer;
     let hexBool;
     switch (this.type) {
@@ -124,7 +126,14 @@ class ResourceInstance {
         break;
       }
       case RESOURCE_TYPE.INTEGER: {
-        valueBuffer = hexBuffer(this.value.toString(16));
+        if (
+          2 ** 7 <= value < 2**8
+          || 2 ** 15 <= value < 2**16
+        ) {
+          valueBuffer = hexBuffer('00' + value.toString(16));
+          break;
+        }
+        valueBuffer = hexBuffer(value.toString(16));
         break;
       }
       case RESOURCE_TYPE.FLOAT: {

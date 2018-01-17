@@ -14,15 +14,16 @@ class ObjectInstance {
     this.resources[`${identifier}`] = new ResourceInstance(identifier, permissions, type, value, handler);
   }
 
+  writeResource(identifier, value, force = false) {
+    return this.resources[identifier].writeValue(value, force);
+  }
+
   deleteResource(identifier, force = false) {
-    if (
-      force === true
-      || this.resources[identifier].deleteResource() === true
-    ) {
-      delete this.resources[identifier];
-      return '2.02';
-    }
-    return '4.05';
+    return this.resources[identifier].deleteResource(force);
+  }
+
+  getResourceValue(identifier, callback) {
+    callback(this.resources[identifier].getValue());
   }
 
   getResourceTLV(identifier, callback) {
