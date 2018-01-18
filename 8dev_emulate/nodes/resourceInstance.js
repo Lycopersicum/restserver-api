@@ -43,7 +43,7 @@ class ResourceInstance {
   }
 
   writeValue(value, force) {
-    if ( (this.permissions.indexOf('W') > -1) || force ) {
+    if (this.permissions.indexOf('W') > -1 || force) {
       this.value = value;
       return '2.04';
     }
@@ -51,7 +51,7 @@ class ResourceInstance {
   }
 
   deleteResource(force) {
-    if (this.permissions.indexOf('D') > -1) {
+    if (this.permissions.indexOf('D') > -1 || force) {
       return '2.02';
     }
     return '4.05';
@@ -120,7 +120,7 @@ class ResourceInstance {
   }
 
   getValueBytes() {
-    let value = this.getValue();
+    const value = this.getValue();
     let valueBuffer;
     let hexBool;
     switch (this.type) {
@@ -129,14 +129,14 @@ class ResourceInstance {
         break;
       }
       case RESOURCE_TYPE.INTEGER: {
-        if (2 ** 7  <= value && value < 2 ** 8) {
-          valueBuffer = hexBuffer('00' + value.toString(16));
+        if (2 ** 7 <= value && value < 2 ** 8) {
+          valueBuffer = hexBuffer(`00${value.toString(16)}`);
           break;
         } else if (2 ** 15 <= value && value < 2 ** 16) {
-          valueBuffer = hexBuffer('0000' + value.toString(16));
+          valueBuffer = hexBuffer(`0000${value.toString(16)}`);
           break;
         } else if (2 ** 31 <= value && value < 2 ** 32) {
-          valueBuffer = hexBuffer('00000000' + value.toString(16));
+          valueBuffer = hexBuffer(`00000000${value.toString(16)}`);
           break;
         }
         valueBuffer = hexBuffer(value.toString(16));
@@ -176,7 +176,6 @@ class ResourceInstance {
         this.getLengthBytes(),
         this.getValueBytes(),
       ]);
-      console.log(buffer);
       callback(buffer);
       return '2.05';
     }
