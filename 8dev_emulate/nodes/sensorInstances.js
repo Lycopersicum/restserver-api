@@ -12,11 +12,15 @@ function randomInteger(min, max) {
 }
 
 function powerSourceVoltageHandler(averageVoltage = 3300, fluctuation = 0.005) {
-  return randomInteger(averageVoltage * (1 - fluctuation), averageVoltage * (1 + fluctuation));
+  const fluctuationMin = averageVoltage * (1 - fluctuation);
+  const fluctuationMax = averageVoltage * (1 + fluctuation);
+  return randomInteger(fluctuationMin, fluctuationMax);
 }
 
 function temperatureSensorHandler(averageTemperature = 20, fluctuation = 0.025) {
-  return randomFloat(averageTemperature * (1 - fluctuation), averageTemperature * (1 + fluctuation));
+  const fluctuationMin = averageTemperature * (1 - fluctuation);
+  const fluctuationMax = averageTemperature * (1 + fluctuation);
+  return randomFloat(fluctuationMin, fluctuationMax);
 }
 
 class Sensor3700 extends ClientNode {
@@ -41,7 +45,7 @@ class Sensor4400 extends ClientNode {
 
     this.createObject(3200, 0);
     this.createObject(3303, 0);
-    
+
     this.objects['/3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
     this.objects['/3200/0'].addResource(5500, 'R', RESOURCE_TYPE.BOOLEAN, false);
     this.objects['/3200/0'].addResource(5501, 'R', RESOURCE_TYPE.INTEGER, 0);
@@ -50,10 +54,10 @@ class Sensor4400 extends ClientNode {
 
   hallSensorTrigger() {
     const that = this;
-    this.objects['/3200/0'].getResourceValue(5500, (value) => {
-      that.objects['/3200/0'].writeResource(5500, !value, true);
-      that.objects['/3200/0'].getResourceValue(5501, (value) => {
-        that.objects['/3200/0'].writeResource(5501, (value + 1) % (2 ** 31), true);
+    this.objects['/3200/0'].getResourceValue(5500, (hallSensorValue) => {
+      that.objects['/3200/0'].writeResource(5500, !hallSensorValue, true);
+      that.objects['/3200/0'].getResourceValue(5501, (hallSensorCounterValue) => {
+        that.objects['/3200/0'].writeResource(5501, (hallSensorCounterValue + 1) % (2 ** 31), true);
       });
     });
   }
