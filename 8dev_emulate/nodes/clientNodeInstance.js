@@ -30,7 +30,7 @@ class ClientNodeInstance {
     };
 
     this.initiateSecurityObject(serverURI);
-    this.initiateServerObject(lifetime);
+    this.initiateServerObject(lifetime, queueMode);
     this.initiateAccessControlObject();
     this.initiateDeviceObject(manufacturer, model, queueMode);
     this.initiateConnectivityMonitoringObject();
