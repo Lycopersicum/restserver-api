@@ -10,6 +10,7 @@ coap.registerFormat('application/vnd.oma.lwm2m+tlv', 11542);
 class ClientNodeInstance {
   constructor(lifetime, manufacturer, model, queueMode, endpointClientName, serverURI, clientPort) {
     this.objects = {};
+    this.observed = {};
     this.updatesPath = '';
     this.registrationPath = '/rd';
     this.listeningPort = clientPort;
@@ -121,55 +122,87 @@ class ClientNodeInstance {
   }
 
   requestListener(request, response) {
-    // TODO: Add resource access handlers
     const addressArray = [];
+    const address = '/';
+    let observation;
     for (let i = 0; i < request.options.length; i += 1) {
       if (request.options[i].name === 'Uri-Path') {
         addressArray.push(request.options[i].value.toString());
       }
+      if (request.options[i].name === 'Observe') {
+        observation = request.options[i].value.toString()
+        // TODO: Add Observe: 0 option to response
+      }
+    }
+    if (observation === '0') {
+      // TODO: Begin observation
+    } else if (observation === '1') {
+      // TODO: End observation
     }
     switch (request.method) {
       case 'GET': {
-        if (addressArray.length === 1) {
-        // TODO: Add handlers for objects reading
-        } else if (addressArray.length === 2) {
-        // TODO: Add handlers for object instances reading
-          response.statusCode = '4.06';
-        } else if (addressArray.length === 3) {
-        // TODO: Add handlers for resources reading
-          const objectInstance = `/${addressArray[0]}/${addressArray[1]}`;
-          if (this.objects[objectInstance] instanceof ObjectInstance) {
-            response.statusCode = this.objects[objectInstance].getResourceTLV(addressArray[2], (buffer) => {
-              response.write(buffer);
-            });
-          } else {
-            response.statusCode = '4.04';
-          }
-        } else if (addressArray.length === 4) {
-        // TODO: Add handlers for resource instances reading
-          response.statusCode = '4.00';
-        } else {
-          response.statusCode = '4.00';
-        }
+        this.requestGet(response, addressArray);
         break;
       }
       case 'PUT': {
-        // TODO: Add handlers for resource writing
+        this.requestPut(response, addressArray);
         break;
       }
       case 'POST': {
-        // TODO: Add handlers for resource execution
+        this.requestPost(response, addressArray);
         break;
       }
       case 'DELETE': {
-        // TODO: Add handlers for resource deletion
+        this.requestDelete(response, addressArray);
         break;
       }
       default: {
         // TODO: Implement switch statement default case
       }
     }
+  }
+
+  requestGet(response, addressArray, observeNotification = false) {
+    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
+    if (addressArray.length === 1) {
+    // TODO: Add handlers for objects reading
+    } else if (addressArray.length === 2) {
+    // TODO: Add handlers for object instances reading
+      response.statusCode = '4.06';
+    } else if (addressArray.length === 3) {
+    // TODO: Add handlers for resources reading
+      if (this.objects[objectInstance] instanceof ObjectInstance) {
+        response.statusCode = this.objects[objectInstance].getResourceTLV(addressArray[2], (buffer) => {
+          response.write(buffer);
+        });
+      } else {
+        response.statusCode = '4.04';
+      }
+    } else if (addressArray.length === 4) {
+    // TODO: Add handlers for resource instances reading
+      response.statusCode = '4.00';
+    } else {
+      response.statusCode = '4.00';
+    }
+    if (observeNotification) {
+      // TODO: Add notification header
+    }
     response.end();
+  }
+
+  requestPut(response, addressArray) {
+    // TODO: Add handlers for resource writing
+    response.end()
+  }
+
+  requestPost(response, addressArray) {
+    // TODO: Add handlers for resource execution
+    response.end()
+  }
+
+  requestDelete(response, addressArray) {
+    // TODO: Add handlers for resource deletion
+    response.end()
   }
 
   getQueryString() {
@@ -224,7 +257,7 @@ class ClientNodeInstance {
     this.coapServer.listen(that.listeningPort, () => {
       that.updatesIterator = setInterval(() => {
         that.update(() => {});
-      }, 3000);
+      }, 10000);
     });
   }
 
