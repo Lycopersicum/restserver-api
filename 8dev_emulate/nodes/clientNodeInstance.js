@@ -4,13 +4,14 @@ const coap = require('coap');
 const ObjectInstance = require('./objectInstance.js');
 const { RESOURCE_TYPE } = require('./resourceInstance.js');
 
+const DATE = new Date();
 const LWM2M_VERSION = '1.0';
 coap.registerFormat('application/vnd.oma.lwm2m+tlv', 11542);
 
 class ClientNodeInstance {
   constructor(lifetime, manufacturer, model, queueMode, endpointClientName, serverURI, clientPort) {
     this.objects = {};
-    this.observed = {};
+    this.observedResources = {};
     this.updatesPath = '';
     this.registrationPath = '/rd';
     this.listeningPort = clientPort;
@@ -121,71 +122,38 @@ class ClientNodeInstance {
     this.createObject(7, 0);
   }
 
-  requestListener(request, response) {
-    const addressArray = [];
-    const address = '/';
-    let observation;
-    for (let i = 0; i < request.options.length; i += 1) {
-      if (request.options[i].name === 'Uri-Path') {
-        addressArray.push(request.options[i].value.toString());
-      }
-      if (request.options[i].name === 'Observe') {
-        observation = request.options[i].value.toString()
-        // TODO: Add Observe: 0 option to response
-      }
-    }
-    if (observation === '0') {
-      // TODO: Begin observation
-    } else if (observation === '1') {
-      // TODO: End observation
-    }
-    switch (request.method) {
-      case 'GET': {
-        this.requestGet(response, addressArray);
+  requestGet(response, addressArray) {
+    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
+    switch (addressArray.length) {
+      case 1: {
+        // TODO: Add handlers for objects reading
+        response.statusCode = '4.06';
         break;
-      }
-      case 'PUT': {
-        this.requestPut(response, addressArray);
+      } 
+      case 2: {
+        // TODO: Add handlers for object instances reading
+        response.statusCode = '4.06';
         break;
-      }
-      case 'POST': {
-        this.requestPost(response, addressArray);
+      } 
+      case 3: {
+        // TODO: Add handlers for resources reading
+        if (this.objects[objectInstance] instanceof ObjectInstance) {
+          response.statusCode = this.objects[objectInstance].getResourceTLV(addressArray[2], (buffer) => {
+            response.write(buffer);
+          });
+        } else {
+          response.statusCode = '4.04';
+        }
         break;
-      }
-      case 'DELETE': {
-        this.requestDelete(response, addressArray);
+      } 
+      case 4: {
+        // TODO: Add handlers for resource instances reading
+        response.statusCode = '4.00';
         break;
       }
       default: {
-        // TODO: Implement switch statement default case
+        response.statusCode = '4.00';
       }
-    }
-  }
-
-  requestGet(response, addressArray, observeNotification = false) {
-    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
-    if (addressArray.length === 1) {
-    // TODO: Add handlers for objects reading
-    } else if (addressArray.length === 2) {
-    // TODO: Add handlers for object instances reading
-      response.statusCode = '4.06';
-    } else if (addressArray.length === 3) {
-    // TODO: Add handlers for resources reading
-      if (this.objects[objectInstance] instanceof ObjectInstance) {
-        response.statusCode = this.objects[objectInstance].getResourceTLV(addressArray[2], (buffer) => {
-          response.write(buffer);
-        });
-      } else {
-        response.statusCode = '4.04';
-      }
-    } else if (addressArray.length === 4) {
-    // TODO: Add handlers for resource instances reading
-      response.statusCode = '4.00';
-    } else {
-      response.statusCode = '4.00';
-    }
-    if (observeNotification) {
-      // TODO: Add notification header
     }
     response.end();
   }
@@ -268,6 +236,89 @@ class ClientNodeInstance {
     }
   }
 
+  startObservation(addressArray, token) {
+    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
+    console.log('starting observation for resources...');
+    let observeResources = [];
+    console.log('starting observation for ', objectInstance);
+    switch (addressArray.length) {
+      case 1: {
+        // TODO: Add handlers for objects observation
+        break;
+      } 
+      case 2: {
+        // TODO: Add handlers for object instances observation
+        break;
+      } 
+      case 3: {
+        // TODO: Add handlers for resources observation
+        console.log('inside switch');
+        observeResources.push(this.objects[objectInstance].resources[addressArray[2]])
+        this.observedResources[addressArray.join('/')] = {
+          'observationTime': DATE.getTime(),
+          'lastNotification': DATE.getTime(),
+          'token': token,
+        }
+        console.log(this.observedResources);
+        break;
+      }
+      case 4: {
+        // TODO: Add handlers for resource instances observation
+        break;
+      }
+      default: {
+        // TODO: Handle bad observation requests
+      }
+    }
+    console.log('before the loop');
+    for (let i = 0; i < observeResources.length; i += 1) {
+      resource.observe('value', (changes) => {
+        console.log(changes);
+        console.log(resource.value);
+        // TODO: Form Notification request
+        // let notificationOptions = {
+        //   options = { Observe: that.observedResources
+        // let request = coap.request();
+        //
+        // ;
+        return resource.value;
+      });
+    }
+  }
+
+  stopObservation(addressArray) {
+    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
+    let unobserveResources = [];
+    switch (addressArray.length) {
+      case 1: {
+        // TODO: Add handlers for objects observation
+        break;
+      } 
+      case 2: {
+        // TODO: Add handlers for object instances observation
+        break;
+      } 
+      case 3: {
+        // TODO: Add handlers for resources observation
+        unobserveResources.push(this.objects[objcestInstance].resources[addressArray[2]])
+        delete this.observedResources['/' + addressArray.join('/')];
+        break;
+      } 
+      case 4: {
+        // TODO: Add handlers for resource instances observation
+        break;
+      }
+      default: {
+        // TODO: Handle bad observation requests
+      }
+    }
+    for (let i = 0; i < unobserveResources.length; i += 1) {
+      resource.observe('value', (changes) => {
+        return resource.value;
+      });
+    }
+  }
+
   register(callback) {
     const messageBody = this.getObjectInstancesList().join(',');
     const registrationOptions = Object.assign({}, this.requestOptions);
@@ -324,6 +375,54 @@ class ClientNodeInstance {
     }
     if (callback && typeof callback === 'function') {
       callback();
+    }
+  }
+
+  requestListener(request, response) {
+    const addressArray = [];
+    let observation;
+    for (let i = 0; i < request.options.length; i += 1) {
+      if (request.options[i].name === 'Uri-Path') {
+        addressArray.push(request.options[i].value.toString());
+      }
+    }
+    switch (request.headers['Observe']) {
+      case 0: {
+        console.log('starting observation!');
+        console.log(this.updatesPath);
+        this.startObservation(addressArray, null);
+        response.setOption('Observe', 0);
+        break;
+      }
+      case 1: {
+        console.log('ending observation!');
+        this.stopObservation(addressArray, null);
+        break;
+      }
+      default: {
+      }
+    }
+
+    switch (request.method) {
+      case 'GET': {
+        this.requestGet(response, addressArray);
+        break;
+      }
+      case 'PUT': {
+        this.requestPut(response, addressArray);
+        break;
+      }
+      case 'POST': {
+        this.requestPost(response, addressArray);
+        break;
+      }
+      case 'DELETE': {
+        this.requestDelete(response, addressArray);
+        break;
+      }
+      default: {
+        // TODO: Implement switch statement default case
+      }
     }
   }
 }
