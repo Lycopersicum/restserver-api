@@ -184,8 +184,9 @@ class ClientNodeInstance {
   }
 
   update(callback, updateLifetime = false, updateBinding = false) {
-    let queryString = '';
     const updateOptions = Object.assign({}, this.requestOptions);
+    const that = this;
+    let queryString = '';
     updateOptions.pathname = this.updatesPath;
 
     if (updateLifetime) {
@@ -209,11 +210,11 @@ class ClientNodeInstance {
         }
         case '4.04': {
           // TODO: Decide if to add registering in case of unregistered device.
-          this.stopUpdates();
+          that.stopUpdates();
           break;
         }
         default: {
-          this.stopUpdates();
+          that.stopUpdates();
         }
       }
     });
