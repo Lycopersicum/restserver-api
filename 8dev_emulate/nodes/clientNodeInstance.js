@@ -236,11 +236,13 @@ class ClientNodeInstance {
     }
   }
 
-  startObservation(addressArray, token) {
+  startObservation(addressArray, response) {
+    const observationTime = new Date().getTime()
     const objectInstance = '/' + addressArray.slice(0, 2).join('/');
-    console.log('starting observation for resources...');
     let observeResources = [];
-    console.log('starting observation for ', objectInstance);
+
+    response.statusCode = '2.05';
+
     switch (addressArray.length) {
       case 1: {
         // TODO: Add handlers for objects observation
@@ -251,15 +253,9 @@ class ClientNodeInstance {
         break;
       } 
       case 3: {
-        // TODO: Add handlers for resources observation
-        console.log('inside switch');
-        observeResources.push(this.objects[objectInstance].resources[addressArray[2]])
-        this.observedResources[addressArray.join('/')] = {
-          'observationTime': DATE.getTime(),
-          'lastNotification': DATE.getTime(),
-          'token': token,
-        }
-        console.log(this.observedResources);
+        observeResources.push({
+          'resource': this.objects[objectInstance].resources[addressArray[2]],
+          });
         break;
       }
       case 4: {
@@ -270,18 +266,12 @@ class ClientNodeInstance {
         // TODO: Handle bad observation requests
       }
     }
-    console.log('before the loop');
+
     for (let i = 0; i < observeResources.length; i += 1) {
-      resource.observe('value', (changes) => {
-        console.log(changes);
-        console.log(resource.value);
-        // TODO: Form Notification request
-        // let notificationOptions = {
-        //   options = { Observe: that.observedResources
-        // let request = coap.request();
-        //
-        // ;
-        return resource.value;
+      observeResources[i].resource.addObservationHandler((buffer) => {
+        let currentTime = (new Date().getTime()) - observationTime;
+        response.setOption('Observe', currentTime);
+        response.write(buffer);
       });
     }
   }
@@ -388,15 +378,14 @@ class ClientNodeInstance {
     }
     switch (request.headers['Observe']) {
       case 0: {
-        console.log('starting observation!');
-        console.log(this.updatesPath);
-        this.startObservation(addressArray, null);
+        this.startObservation(addressArray, response);
         response.setOption('Observe', 0);
-        break;
+        // break;
+        return;
       }
       case 1: {
-        console.log('ending observation!');
-        this.stopObservation(addressArray, null);
+        // TODO: Implement end of observation
+        this.stopObservation(addressArray);
         break;
       }
       default: {

@@ -26,6 +26,14 @@ class ObjectInstance {
     callback(this.resources[identifier].getValue());
   }
 
+  observeResource(identifier, handler) {
+    this.resources[identifier].addObservationHandler(handler);
+  }
+
+  unobserveResource(identifier) {
+    this.resources[identifier].deleteObservationHandler();
+  }
+
   getResourceTLV(identifier, callback) {
     return this.resources[identifier].getTLVBuffer(callback);
   }

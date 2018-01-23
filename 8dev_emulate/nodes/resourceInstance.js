@@ -25,26 +25,44 @@ class ResourceInstance {
     this.value = value;
     this.handler = handler;
     this.permissions = permissions;
+    this.valueSetIterator = handler === undefined ? undefined : setInterval(() => {
+      this.setValue();
+    }, 100);
   }
 
   readValue(callback) {
     if (this.permissions.indexOf('R') > -1) {
-      callback(this.getValue());
+      this.value;
       return '2.05';
     }
     return '4.05';
   }
 
-  getValue() {
-    if (typeof this.handler === 'function') {
-      this.value = this.handler();
+  addObservationHandler(handler) {
+    this.observationHandler = handler;
+  }
+
+  deleteObservationHandler() {
+    this.observationHandler = undefined;
+  }
+
+  setValue(newValue = undefined) {
+    const oldValue = this.value;
+    if ((newValue === undefined) && (typeof this.handler === 'function')) {
+      newValue = this.handler();
     }
-    return this.value;
+    this.value = newValue;
+    if (
+      (newValue !== oldValue) 
+      && (typeof this.observationHandler === 'function')
+    ) {
+      this.getTLVBuffer(this.observationHandler);
+    }
   }
 
   writeValue(value, force) {
     if (this.permissions.indexOf('W') > -1 || force) {
-      this.value = value;
+      this.setValue(value);
       return '2.04';
     }
     return '4.05';
