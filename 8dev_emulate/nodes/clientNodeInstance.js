@@ -62,17 +62,17 @@ class ClientNodeInstance {
   initiateSecurityObject(serverURI, clientPSK = null, publicKey = null, serverRPK = null, secretKey = null) {
     this.createObject(0, 0);
     // LwM2M Server URI
-    this.objects['/0/0'].addResource(0, 'RW', RESOURCE_TYPE.STRING, serverURI);
+    this.objects['0/0'].addResource(0, 'RW', RESOURCE_TYPE.STRING, serverURI);
     // Bootstrap Server
-    this.objects['/0/0'].addResource(1, 'RW', RESOURCE_TYPE.BOOLEAN, false);
+    this.objects['0/0'].addResource(1, 'RW', RESOURCE_TYPE.BOOLEAN, false);
     // Security Mode (0-4). 3 if NoSec, 0 if PSK
-    this.objects['/0/0'].addResource(2, 'RW', RESOURCE_TYPE.INTEGER, clientPSK === null ? 3 : 0);
+    this.objects['0/0'].addResource(2, 'RW', RESOURCE_TYPE.INTEGER, clientPSK === null ? 3 : 0);
     // Public Key or Identity
-    this.objects['/0/0'].addResource(3, 'RW', RESOURCE_TYPE.OPAQUE, publicKey);
+    this.objects['0/0'].addResource(3, 'RW', RESOURCE_TYPE.OPAQUE, publicKey);
     // Server Public Key
-    this.objects['/0/0'].addResource(4, 'RW', RESOURCE_TYPE.OPAQUE, serverRPK);
+    this.objects['0/0'].addResource(4, 'RW', RESOURCE_TYPE.OPAQUE, serverRPK);
     // Secret Key
-    this.objects['/0/0'].addResource(5, 'R', RESOURCE_TYPE.OPAQUE, secretKey);
+    this.objects['0/0'].addResource(5, 'R', RESOURCE_TYPE.OPAQUE, secretKey);
   }
 
   initiateServerObject(lifetime, queueMode) {
@@ -80,19 +80,19 @@ class ClientNodeInstance {
     bindingMode += queueMode ? 'Q' : '';
     this.createObject(1, 0);
     // Short Server ID
-    this.objects['/1/0'].addResource(0, 'R', RESOURCE_TYPE.INTEGER, 1);
+    this.objects['1/0'].addResource(0, 'R', RESOURCE_TYPE.INTEGER, 1);
     // Lifetime
-    this.objects['/1/0'].addResource(1, 'RW', RESOURCE_TYPE.INTEGER, lifetime);
+    this.objects['1/0'].addResource(1, 'RW', RESOURCE_TYPE.INTEGER, lifetime);
     // Default Minimum Period
-    this.objects['/1/0'].addResource(2, 'RW', RESOURCE_TYPE.INTEGER, 0);
+    this.objects['1/0'].addResource(2, 'RW', RESOURCE_TYPE.INTEGER, 0);
     // Default Maximum Period
-    this.objects['/1/0'].addResource(3, 'RW', RESOURCE_TYPE.INTEGER, 0);
+    this.objects['1/0'].addResource(3, 'RW', RESOURCE_TYPE.INTEGER, 0);
     // Notification Storing When Disabled or Offline
-    this.objects['/1/0'].addResource(6, 'RW', RESOURCE_TYPE.BOOLEAN, true);
+    this.objects['1/0'].addResource(6, 'RW', RESOURCE_TYPE.BOOLEAN, true);
     // Binding
-    this.objects['/1/0'].addResource(7, 'RW', RESOURCE_TYPE.STRING, bindingMode);
+    this.objects['1/0'].addResource(7, 'RW', RESOURCE_TYPE.STRING, bindingMode);
     // Registration Update Trigger
-    this.objects['/1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, null, this.update);
+    this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, null, this.update);
     //* update()*/);
   }
 
@@ -105,9 +105,9 @@ class ClientNodeInstance {
     let bindingMode = 'U';
     bindingMode += queueMode ? 'Q' : '';
     this.createObject(3, 0);
-    this.objects['/3/0'].addResource(0, 'R', RESOURCE_TYPE.STRING, manufacturer);
-    this.objects['/3/0'].addResource(1, 'R', RESOURCE_TYPE.STRING, model);
-    this.objects['/3/0'].addResource(16, 'R', RESOURCE_TYPE.STRING, bindingMode);
+    this.objects['3/0'].addResource(0, 'R', RESOURCE_TYPE.STRING, manufacturer);
+    this.objects['3/0'].addResource(1, 'R', RESOURCE_TYPE.STRING, model);
+    this.objects['3/0'].addResource(16, 'R', RESOURCE_TYPE.STRING, bindingMode);
   }
   initiateConnectivityMonitoringObject() {
     this.createObject(4, 0);
@@ -123,7 +123,7 @@ class ClientNodeInstance {
   }
 
   requestGet(response, addressArray) {
-    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
+    const objectInstance = addressArray.slice(0, 2).join('/');
     switch (addressArray.length) {
       case 1: {
         // TODO: Add handlers for objects reading
@@ -176,10 +176,10 @@ class ClientNodeInstance {
   getQueryString() {
     let queryString;
     queryString = `ep=${this.endpointClientName}`;
-    queryString += `&lt=${this.objects['/1/0'].resources['1'].getValue()}`;
+    queryString += `&lt=${this.objects['1/0'].resources['1'].getValue()}`;
     queryString += `&lwm2m=${LWM2M_VERSION}`;
-    queryString += `&b=${this.objects['/1/0'].resources['7'].getValue()}`;
-    queryString += `&et=${this.objects['/3/0'].resources['1'].getValue()}`;
+    queryString += `&b=${this.objects['1/0'].resources['7'].getValue()}`;
+    queryString += `&et=${this.objects['3/0'].resources['1'].getValue()}`;
     return queryString;
   }
 
@@ -190,11 +190,11 @@ class ClientNodeInstance {
     updateOptions.pathname = this.updatesPath;
 
     if (updateLifetime) {
-      queryString += `lt=${this.objects['/1/0'].resources['1'].getValue()}`;
+      queryString += `lt=${this.objects['1/0'].resources['1'].getValue()}`;
     }
 
     if (updateBinding) {
-      queryString += `b=${this.objects['/1/0'].resources['7'].getValue()}`;
+      queryString += `b=${this.objects['1/0'].resources['7'].getValue()}`;
     }
 
     if (queryString !== '') {
@@ -239,7 +239,7 @@ class ClientNodeInstance {
 
   startObservation(addressArray, response) {
     const observationTime = new Date().getTime()
-    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
+    const objectInstance = addressArray.slice(0, 2).join('/');
     let observeResources = [];
 
     response.statusCode = '2.05';
@@ -278,7 +278,7 @@ class ClientNodeInstance {
   }
 
   stopObservation(addressArray) {
-    const objectInstance = '/' + addressArray.slice(0, 2).join('/');
+    const objectInstance = addressArray.slice(0, 2).join('/');
     let unobserveResources = [];
     switch (addressArray.length) {
       case 1: {
@@ -292,7 +292,7 @@ class ClientNodeInstance {
       case 3: {
         // TODO: Add handlers for resources observation
         unobserveResources.push(this.objects[objcestInstance].resources[addressArray[2]])
-        delete this.observedResources['/' + addressArray.join('/')];
+        delete this.observedResources[addressArray.join('/')];
         break;
       } 
       case 4: {

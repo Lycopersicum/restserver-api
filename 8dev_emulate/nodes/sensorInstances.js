@@ -27,7 +27,7 @@ class Sensor3700 extends ClientNode {
   constructor(lifetime, UUID, serverIP, clientPort) {
     super(lifetime, '8devices', '8dev_3700', true, UUID, serverIP, clientPort);
 
-    this.objects['/3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
+    this.objects['3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
   }
 }
 
@@ -35,7 +35,7 @@ class Sensor3800 extends ClientNode {
   constructor(lifetime, UUID, serverIP, clientPort) {
     super(lifetime, '8devices', '8dev_3800', true, UUID, serverIP, clientPort);
 
-    this.objects['/3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
+    this.objects['3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
   }
 }
 
@@ -46,18 +46,18 @@ class Sensor4400 extends ClientNode {
     this.createObject(3200, 0);
     this.createObject(3303, 0);
 
-    this.objects['/3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
-    this.objects['/3200/0'].addResource(5500, 'R', RESOURCE_TYPE.BOOLEAN, false);
-    this.objects['/3200/0'].addResource(5501, 'R', RESOURCE_TYPE.INTEGER, 0);
-    this.objects['/3303/0'].addResource(5700, 'R', RESOURCE_TYPE.FLOAT, 20.0, temperatureSensorHandler);
+    this.objects['3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
+    this.objects['3200/0'].addResource(5500, 'R', RESOURCE_TYPE.BOOLEAN, false);
+    this.objects['3200/0'].addResource(5501, 'R', RESOURCE_TYPE.INTEGER, 0);
+    this.objects['3303/0'].addResource(5700, 'R', RESOURCE_TYPE.FLOAT, 20.0, temperatureSensorHandler);
   }
 
   hallSensorTrigger() {
     const that = this;
-    this.objects['/3200/0'].getResourceValue(5500, (hallSensorValue) => {
-      that.objects['/3200/0'].writeResource(5500, !hallSensorValue, true);
-      that.objects['/3200/0'].getResourceValue(5501, (hallSensorCounterValue) => {
-        that.objects['/3200/0'].writeResource(5501, (hallSensorCounterValue + 1) % (2 ** 31), true);
+    this.objects['3200/0'].getResourceValue(5500, (hallSensorValue) => {
+      that.objects['3200/0'].writeResource(5500, !hallSensorValue, true);
+      that.objects['3200/0'].getResourceValue(5501, (hallSensorCounterValue) => {
+        that.objects['3200/0'].writeResource(5501, (hallSensorCounterValue + 1) % (2 ** 31), true);
       });
     });
   }
@@ -67,7 +67,7 @@ class Sensor4500 extends ClientNode {
   constructor(lifetime, UUID, serverIP, clientPort) {
     super(lifetime, '8devices', '8dev_4500', true, UUID, serverIP, clientPort);
 
-    this.objects['/3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
+    this.objects['3/0'].addResource(7, 'R', RESOURCE_TYPE.INTEGER, 3300, powerSourceVoltageHandler);
   }
 }
 
