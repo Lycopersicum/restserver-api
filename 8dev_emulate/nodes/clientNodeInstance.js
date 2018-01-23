@@ -176,15 +176,13 @@ class ClientNodeInstance {
   }
 
   getQueryString() {
-    const queryString = [
+    return [
       `ep=${this.endpointClientName}`,
       `lt=${this.objects['1/0'].resources['1'].getValue()}`,
       `lwm2m=${LWM2M_VERSION}`,
       `b=${this.objects['1/0'].resources['7'].getValue()}`,
       `et=${this.objects['3/0'].resources['1'].getValue()}`,
     ].join('&');
-    console.log(queryString);
-    return queryString;
   }
 
   update(callback, updateLifetime = false, updateBinding = false) {
