@@ -42,11 +42,11 @@ class ClientNodeInstance {
   }
 
   createObject(objectID, instanceID) {
-    this.objects[`/${objectID}/${instanceID}`] = new ObjectInstance(objectID, instanceID);
+    this.objects[`${objectID}/${instanceID}`] = new ObjectInstance(objectID, instanceID);
   }
 
   addResource(objectID, instanceID, resourceID, access, type, handler) {
-    this.objects[`/${objectID}/${instanceID}`].addResource(resourceID, access, type, handler);
+    this.objects[`${objectID}/${instanceID}`].addResource(resourceID, access, type, handler);
   }
 
   getObjectInstancesList() {
@@ -92,7 +92,9 @@ class ClientNodeInstance {
     // Binding
     this.objects['1/0'].addResource(7, 'RW', RESOURCE_TYPE.STRING, bindingMode);
     // Registration Update Trigger
-    this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, null, this.update);
+    this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, null, () => {
+      this.update();
+    });
     //* update()*/);
   }
 
@@ -174,18 +176,19 @@ class ClientNodeInstance {
   }
 
   getQueryString() {
-    let queryString;
-    queryString = `ep=${this.endpointClientName}`;
-    queryString += `&lt=${this.objects['1/0'].resources['1'].getValue()}`;
-    queryString += `&lwm2m=${LWM2M_VERSION}`;
-    queryString += `&b=${this.objects['1/0'].resources['7'].getValue()}`;
-    queryString += `&et=${this.objects['3/0'].resources['1'].getValue()}`;
+    const queryString = [
+      `ep=${this.endpointClientName}`,
+      `lt=${this.objects['1/0'].resources['1'].getValue()}`,
+      `lwm2m=${LWM2M_VERSION}`,
+      `b=${this.objects['1/0'].resources['7'].getValue()}`,
+      `et=${this.objects['3/0'].resources['1'].getValue()}`,
+    ].join('&');
+    console.log(queryString);
     return queryString;
   }
 
   update(callback, updateLifetime = false, updateBinding = false) {
     const updateOptions = Object.assign({}, this.requestOptions);
-    const that = this;
     let queryString = '';
     updateOptions.pathname = this.updatesPath;
 
@@ -205,16 +208,18 @@ class ClientNodeInstance {
     request.on('response', (response) => {
       switch (response.code) {
         case '2.04': {
-          callback();
+          if (typeof callback === 'function') {
+            callback();
+          };
           break;
         }
         case '4.04': {
           // TODO: Decide if to add registering in case of unregistered device.
-          that.stopUpdates();
+          this.stopUpdates();
           break;
         }
         default: {
-          that.stopUpdates();
+          this.stopUpdates();
         }
       }
     });

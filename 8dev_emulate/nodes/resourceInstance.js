@@ -30,6 +30,10 @@ class ResourceInstance {
     }, 100);
   }
 
+  getValue() {
+    return this.value;
+  }
+
   readValue(callback) {
     if (this.permissions.indexOf('R') > -1) {
       this.value;
