@@ -23,6 +23,9 @@ class ObjectInstance {
   }
 
   getResourceValue(identifier, callback) {
+    if (typeof callback !== 'function') {
+      return this.resources[identifier].value;
+    }
     callback(this.resources[identifier].value);
   }
 

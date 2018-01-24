@@ -22,7 +22,7 @@ sen44.register(() => {
 sen441.register(() => {
   setInterval(() => {
     sen441.hallSensorTrigger();
-  }, 7000);
+  }, 70000);
 });
 sen45.register(() => {});
 
