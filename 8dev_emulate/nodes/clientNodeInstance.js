@@ -92,9 +92,9 @@ class ClientNodeInstance {
     // Binding
     this.objects['1/0'].addResource(7, 'RW', RESOURCE_TYPE.STRING, bindingMode);
     // Registration Update Trigger
-    this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, null, () => {
-      this.update();
-    });
+    // this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, null, () => {
+    //   this.update();
+    // });
     //* update()*/);
   }
 
@@ -124,8 +124,14 @@ class ClientNodeInstance {
     this.createObject(7, 0);
   }
 
-  requestGet(response, addressArray) {
+  requestGet(response, addressArray, observation) {
     const objectInstance = addressArray.slice(0, 2).join('/');
+    response._packet.ack = true;
+
+    if (observation !== undefined) {
+      response.setOption('Observe', observation);
+    }
+
     switch (addressArray.length) {
       case 1: {
         // TODO: Add handlers for objects reading
@@ -157,7 +163,10 @@ class ClientNodeInstance {
         response.statusCode = '4.00';
       }
     }
-    response.end();
+
+    if (observation !== 0) {
+      response.end();
+    }
   }
 
   requestPut(response, addressArray) {
@@ -178,10 +187,10 @@ class ClientNodeInstance {
   getQueryString() {
     return [
       `ep=${this.endpointClientName}`,
-      `lt=${this.objects['1/0'].resources['1'].getValue()}`,
+      `lt=${this.objects['1/0'].resources['1'].value}`,
       `lwm2m=${LWM2M_VERSION}`,
-      `b=${this.objects['1/0'].resources['7'].getValue()}`,
-      `et=${this.objects['3/0'].resources['1'].getValue()}`,
+      `b=${this.objects['1/0'].resources['7'].value}`,
+      `et=${this.objects['3/0'].resources['1'].value}`,
     ].join('&');
   }
 
@@ -191,11 +200,11 @@ class ClientNodeInstance {
     updateOptions.pathname = this.updatesPath;
 
     if (updateLifetime) {
-      queryString += `lt=${this.objects['1/0'].resources['1'].getValue()}`;
+      queryString += `lt=${this.objects['1/0'].resources['1'].value}`;
     }
 
     if (updateBinding) {
-      queryString += `b=${this.objects['1/0'].resources['7'].getValue()}`;
+      queryString += `b=${this.objects['1/0'].resources['7'].value}`;
     }
 
     if (queryString !== '') {
@@ -240,12 +249,16 @@ class ClientNodeInstance {
     }
   }
 
-  startObservation(addressArray, response) {
+  startObservation(addressArray, notification) {
     const observationTime = new Date().getTime()
     const objectInstance = addressArray.slice(0, 2).join('/');
     let observeResources = [];
+    notification._packet.ack = false;
+    notification._packet.confirmable = true;
 
-    response.statusCode = '2.05';
+    notification.on('response', (response) => {
+      console.log('\n\nReceived response:\n\n', response);
+    });
 
     switch (addressArray.length) {
       case 1: {
@@ -257,9 +270,19 @@ class ClientNodeInstance {
         break;
       } 
       case 3: {
-        observeResources.push({
-          'resource': this.objects[objectInstance].resources[addressArray[2]],
+        if (this.observedResources[addressArray.join('/')] === undefined) {
+          const observation = this.objects[objectInstance].resources[addressArray[2]].on('change', () => {
+          this.objects[objectInstance].resources[addressArray[2]].getTLVBuffer((buffer) => {
+              let currentTime = (new Date().getTime()) - observationTime;
+              notification.setOption('Observe', currentTime);
+              notification.write(buffer);
+              console.log(currentTime);
+            });
           });
+          this.observedResources[addressArray.join('/')] = {
+            'observationTime': observationTime,
+          };
+        }
         break;
       }
       case 4: {
@@ -269,14 +292,6 @@ class ClientNodeInstance {
       default: {
         // TODO: Handle bad observation requests
       }
-    }
-
-    for (let i = 0; i < observeResources.length; i += 1) {
-      observeResources[i].resource.addObservationHandler((buffer) => {
-        let currentTime = (new Date().getTime()) - observationTime;
-        response.setOption('Observe', currentTime);
-        response.write(buffer);
-      });
     }
   }
 
@@ -374,31 +389,16 @@ class ClientNodeInstance {
 
   requestListener(request, response) {
     const addressArray = [];
-    let observation;
     for (let i = 0; i < request.options.length; i += 1) {
       if (request.options[i].name === 'Uri-Path') {
         addressArray.push(request.options[i].value.toString());
       }
     }
-    switch (request.headers['Observe']) {
-      case 0: {
-        this.startObservation(addressArray, response);
-        response.setOption('Observe', 0);
-        // break;
-        return;
-      }
-      case 1: {
-        // TODO: Implement end of observation
-        this.stopObservation(addressArray);
-        break;
-      }
-      default: {
-      }
-    }
 
     switch (request.method) {
       case 'GET': {
-        this.requestGet(response, addressArray);
+        response.setOption('Content-Format', 'application/vnd.oma.lwm2m+tlv');
+        this.requestGet(response, addressArray, request.headers['Observe']);
         break;
       }
       case 'PUT': {
@@ -415,6 +415,18 @@ class ClientNodeInstance {
       }
       default: {
         // TODO: Implement switch statement default case
+      }
+    }
+
+    switch (request.headers['Observe']) {
+      case 0: {
+        response.setOption('Content-Format', 'application/vnd.oma.lwm2m+tlv');
+        this.startObservation(addressArray, response);
+        break;
+      }
+      default: {
+        // TODO: Implement end of observation
+        this.stopObservation(addressArray);
       }
     }
   }

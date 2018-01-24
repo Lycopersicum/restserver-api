@@ -1,5 +1,6 @@
 'use strict';
 
+const EventEmitter = require('events');
 const RESOURCE_TYPE = {
   NONE: 0,
   BOOLEAN: 1,
@@ -18,20 +19,38 @@ function hexBuffer(hexadecimalString) {
   return Buffer.from(hexString, 'hex');
 }
 
-class ResourceInstance {
+class Resource extends EventEmitter {
+  constructor(type, value) {
+    super();
+
+    this.type = type;
+    this._value = value;
+  }
+}
+
+class ResourceInstance extends EventEmitter {
   constructor(identifier, permissions, type, value = undefined, handler = undefined) {
+    super();
+
     this.identifier = identifier;
     this.type = type;
-    this.value = value;
+    this._value = value;
     this.handler = handler;
     this.permissions = permissions;
     this.valueSetIterator = handler === undefined ? undefined : setInterval(() => {
-      this.setValue();
+      this.value = handler();
     }, 100);
   }
 
-  getValue() {
-    return this.value;
+  get value() { return this._value; }
+
+  set value(value) {
+    // TODO: throw exception if value type is incorrect
+
+    if (this._value != value) {
+      this._value = value;
+      this.emit('change');
+    }
   }
 
   readValue(callback) {
@@ -42,31 +61,9 @@ class ResourceInstance {
     return '4.05';
   }
 
-  addObservationHandler(handler) {
-    this.observationHandler = handler;
-  }
-
-  deleteObservationHandler() {
-    this.observationHandler = undefined;
-  }
-
-  setValue(newValue = undefined) {
-    const oldValue = this.value;
-    if ((newValue === undefined) && (typeof this.handler === 'function')) {
-      newValue = this.handler();
-    }
-    this.value = newValue;
-    if (
-      (newValue !== oldValue) 
-      && (typeof this.observationHandler === 'function')
-    ) {
-      this.getTLVBuffer(this.observationHandler);
-    }
-  }
-
   writeValue(value, force) {
     if (this.permissions.indexOf('W') > -1 || force) {
-      this.setValue(value);
+      this.value = value;
       return '2.04';
     }
     return '4.05';
@@ -79,18 +76,26 @@ class ResourceInstance {
     return '4.05';
   }
 
+  addObservationHandler(handler) {
+    this.observationHandler = handler;
+  }
+
+  deleteObservationHandler() {
+    this.observationHandler = undefined;
+  }
+
   getLength() {
     switch (this.type) {
       case RESOURCE_TYPE.NONE:
         return 0;
       case RESOURCE_TYPE.INTEGER:
-        if (this.getValue() === 0) {
+        if (this.value === 0) {
           return 0;
-        } else if (this.getValue() < (2 ** 7)) {
+        } else if (this.value < (2 ** 7)) {
           return 1;
-        } else if (this.getValue() < (2 ** 15)) {
+        } else if (this.value < (2 ** 15)) {
           return 2;
-        } else if (this.getValue() < (2 ** 31)) {
+        } else if (this.value < (2 ** 31)) {
           return 4;
         }
         return 8;
@@ -100,12 +105,12 @@ class ResourceInstance {
       case RESOURCE_TYPE.BOOLEAN:
         return 1;
       case RESOURCE_TYPE.STRING:
-        return this.getValue().length;
+        return this.value.length;
       case RESOURCE_TYPE.OPAQUE:
-        return this.getValue().length;
+        return this.value.length;
       default:
         // Failed to specify type!
-        return this.getValue().length;
+        return this.value.length;
     }
   }
 
@@ -142,7 +147,7 @@ class ResourceInstance {
   }
 
   getValueBytes() {
-    const value = this.getValue();
+    const value = this.value;
     let valueBuffer;
     let hexBool;
     switch (this.type) {

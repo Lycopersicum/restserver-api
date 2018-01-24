@@ -23,7 +23,7 @@ class ObjectInstance {
   }
 
   getResourceValue(identifier, callback) {
-    callback(this.resources[identifier].getValue());
+    callback(this.resources[identifier].value);
   }
 
   observeResource(identifier, handler) {
