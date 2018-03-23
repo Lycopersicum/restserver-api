@@ -50,6 +50,7 @@ class ClientNodeInstance extends EventEmitter {
     this.observedResources = {};
     this.registrationPath = '/rd';
     this.listeningPort = clientPort;
+    this.updatesInterval = 10; // updates interval in seconds
     this.endpointClientName = endpointClientName;
 
     this.coapServer = coap.createServer({ type: 'udp6' }, (req, res) => {
@@ -142,6 +143,7 @@ class ClientNodeInstance extends EventEmitter {
     this.objects['1/0'].addResource(7, 'RW', RESOURCE_TYPE.STRING, bindingMode);
     // Registration Update Trigger
     this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, () => {
+      updateHandler();
     });
   }
 
@@ -337,21 +339,32 @@ class ClientNodeInstance extends EventEmitter {
   }
 
   startUpdates(updatesPath) {
-
     this.coapServer.listen(this.listeningPort, () => {
-      this.updatesIterator = setInterval(() => {
+      this.updatesIterator[updatesPath] = new Interval(() => {
         this.update(updatesPath)
         .then()
         .catch((error) => {
           this.emit('update-failed', error, updatesPath);
         });
-      }, 10000);
+      }, this.updatesInterval * 1000);
     });
   }
 
   stopUpdates(updatesPath) {
-    if (this.updatesIterator) {
-      clearInterval(this.updatesIterator);
+    if (this.updatesIterator[updatesPath] !== undefined) {
+      this.updatesIterator[updatesPath].stop();
+
+      delete this.updatesIterator[updatesPath];
+    }
+  }
+
+  updateHandler(updatesPath) {
+    if (updatesPath === undefined) {
+      for (let path in this.updatesIterator) {
+        this.update(updatesPath);
+      }
+    } else {
+      this.update(updatesPath);
     }
   }
 
