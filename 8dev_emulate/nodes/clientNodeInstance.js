@@ -143,7 +143,7 @@ class ClientNodeInstance extends EventEmitter {
     this.objects['1/0'].addResource(7, 'RW', RESOURCE_TYPE.STRING, bindingMode);
     // Registration Update Trigger
     this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, () => {
-      updateHandler();
+      this.updateHandler();
     });
   }
 
