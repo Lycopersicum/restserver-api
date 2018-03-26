@@ -361,10 +361,18 @@ class ClientNodeInstance extends EventEmitter {
   updateHandler(updatesPath) {
     if (updatesPath === undefined) {
       for (let path in this.updatesIterator) {
-        this.update(path);
+        this.update(path)
+        .then()
+        .catch((error) => {
+          this.emit('update-failed', error, path);
+        });
       }
     } else {
-      this.update(updatesPath);
+      this.update(updatesPath)
+      .then()
+      .catch((error) => {
+        this.emit('update-failed', error, updatesPath);
+      });
     }
   }
 
