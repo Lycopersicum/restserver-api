@@ -614,16 +614,11 @@ class ClientNodeInstance extends EventEmitter {
       }
     }
 
-    switch (request.headers['Observe']) {
-      case 0: {
-        response.setOption('Content-Format', 'application/vnd.oma.lwm2m+tlv');
-        this.startObservation(addressArray, response);
-        break;
-      }
-      default: {
-        // TODO: Implement end of observation
-        this.stopObservation(addressArray);
-      }
+    if (request.headers['Observe'] === 0) {
+      response.setOption('Content-Format', 'application/vnd.oma.lwm2m+tlv');
+      this.startObservation(addressArray, response);
+    } else if (request.headers['Observe'] === 1) {
+      this.stopObservation(addressArray);
     }
   }
 }
