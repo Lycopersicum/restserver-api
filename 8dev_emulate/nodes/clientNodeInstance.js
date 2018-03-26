@@ -342,7 +342,6 @@ class ClientNodeInstance extends EventEmitter {
     this.coapServer.listen(this.listeningPort, () => {
       this.updatesIterator[updatesPath] = new Interval(() => {
         this.update(updatesPath)
-        .then()
         .catch((error) => {
           this.emit('update-failed', error, updatesPath);
         });
@@ -362,14 +361,12 @@ class ClientNodeInstance extends EventEmitter {
     if (updatesPath === undefined) {
       for (let path in this.updatesIterator) {
         this.update(path)
-        .then()
         .catch((error) => {
           this.emit('update-failed', error, path);
         });
       }
     } else {
       this.update(updatesPath)
-      .then()
       .catch((error) => {
         this.emit('update-failed', error, updatesPath);
       });
