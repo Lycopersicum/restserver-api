@@ -615,7 +615,6 @@ class ClientNodeInstance extends EventEmitter {
     }
 
     if (request.headers['Observe'] === 0) {
-      response.setOption('Content-Format', 'application/vnd.oma.lwm2m+tlv');
       this.startObservation(addressArray, response);
     } else if (request.headers['Observe'] === 1) {
       this.stopObservation(addressArray);
