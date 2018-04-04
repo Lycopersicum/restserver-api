@@ -1,6 +1,7 @@
 'use strict';
 
-const lwm2m = require('./lwm2m.js');
+const { INSTANCE_TYPE, parseTLV } = require('./lwm2m.js');
+// const lwm2m = require('./lwm2m.js');
 const { RESOURCE_TYPE, ResourceInstance } = require('./resourceInstance.js');
 
 class ObjectInstance {
@@ -57,10 +58,12 @@ class ObjectInstance {
   }
 
   writeFromTLV(payload) {
-    const resourcesList = lwm2m.parseTLV(payload);
+    // const resourcesList = lwm2m.parseTLV(payload);
+    const resourcesList = parseTLV(payload);
     let value;
 
-    if (resourcesList[0].getType() === lwm2m.TYPE_RESOURCE) {
+    // if (resourcesList[0].getType() === lwm2m.TYPE_RESOURCE) {
+    if (resourcesList[0].getType() === INSTANCE_TYPE.RESOURCE) {
       if (this.resources[`${resourcesList[0].getIdentifier()}`] === undefined) {
         return '4.04';
       }
