@@ -58,13 +58,13 @@ class Sensor3700 extends ClientNode {
     this.objects['3305/0'].resources['5800'].on('change', (currentActivePower) => {
       const cumulativeActivePower = this.objects['3305/0'].resources['5805'].value;
         this.objects['3305/0'].writeResource(
-            5805, (currentActivePower/36000 + cumulativeActivePower) % (2 ** 31), true);
+            5805, (currentActivePower/36000 + cumulativeActivePower) & (0x7FFFFFFF), true); // eslint-disable-line no-bitwise
     });
 
     this.objects['3305/0'].resources['5810'].on('change', (currentReactivePower) => {
       const cumulativeReactivePower = this.objects['3305/0'].resources['5815'].value;
         this.objects['3305/0'].writeResource(
-            5815, (currentReactivePower/36000 + cumulativeReactivePower) % (2 ** 31), true);
+            5815, (currentReactivePower/36000 + cumulativeReactivePower) & (0x7FFFFFFF), true); // eslint-disable-line no-bitwise
     });
   }
 
@@ -112,7 +112,7 @@ class Sensor4400 extends ClientNode {
 
     this.objects['3200/0'].resources['5500'].on('change', () => {
       this.objects['3200/0'].getResourceValue(5501, (hallSensorCounterValue) => {
-        this.objects['3200/0'].writeResource(5501, (hallSensorCounterValue + 1) % (2 ** 31), true);
+        this.objects['3200/0'].writeResource(5501, (hallSensorCounterValue + 1) & (0x7FFFFFFF), true); // eslint-disable-line no-bitwise
       });
     });
   }

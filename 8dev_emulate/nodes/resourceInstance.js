@@ -98,13 +98,13 @@ class ResourceInstance extends EventEmitter {
       case RESOURCE_TYPE.NONE:
         return 0;
       case RESOURCE_TYPE.INTEGER:
-        if (this.value < 0) {
-          return 4;
-        } else if (this.value < (2 ** 8)) {
+        if (this.value === 0) {
+          return 0;
+        } else if (this.value >> 7 === 0) { // eslint-disable-line no-bitwise
           return 1;
-        } else if (this.value < (2 ** 16)) {
+        } else if (this.value >> 15 === 0) { // eslint-disable-line no-bitwise
           return 2;
-        } else if (this.value < (2 ** 31)) {
+        } else if (this.value >> 31 === 0) { // eslint-disable-line no-bitwise
           return 4;
         }
         return 8;
@@ -127,20 +127,24 @@ class ResourceInstance extends EventEmitter {
     const valueLength = this.getLength();
     const lengthBits = valueLength.toString(2).length;
     let typeByteInteger = 0;
+
     this.typeByte = {
       identifierType: 3, // It is Resource
       identifierLength: (this.identifier.toString(2).length <= 8) ? 0 : 1,
       valueLength,
     };
+
     if (lengthBits <= 3) {
       this.typeByte.lengthType = 0;
     } else {
       this.typeByte.lengthType = Math.ceil(lengthBits / 8);
     }
-    typeByteInteger += this.typeByte.identifierType * (2 ** 6);
-    typeByteInteger += this.typeByte.identifierLength * (2 ** 5);
-    typeByteInteger += this.typeByte.lengthType * (2 ** 3);
+
+    typeByteInteger += this.typeByte.identifierType << 6; // eslint-disable-line no-bitwise
+    typeByteInteger += this.typeByte.identifierLength << 5; // eslint-disable-line no-bitwise
+    typeByteInteger += this.typeByte.lengthType << 3; // eslint-disable-line no-bitwise
     typeByteInteger += this.typeByte.valueLength;
+
     return Buffer.from(typeByteInteger.toString(16), 'hex');
   }
 
@@ -156,7 +160,6 @@ class ResourceInstance extends EventEmitter {
   }
 
   getValueBytes() {
-    const value = this.value;
     let valueBuffer;
     let hexBool;
     switch (this.type) {
@@ -165,42 +168,40 @@ class ResourceInstance extends EventEmitter {
         break;
       }
       case RESOURCE_TYPE.INTEGER: {
-        if (value < 0) {
-          valueBuffer = new Buffer(4);
-          valueBuffer.writeInt32BE(value);
-        } else if (value < 2 ** 8) {
-          valueBuffer = new Buffer(1);
-          valueBuffer.writeUInt8(value);
-        } else if (value < 2 ** 16) {
-          valueBuffer = new Buffer(2);
-          valueBuffer.writeUInt16BE(value);
-        } else {
-          valueBuffer = new Buffer(4);
-          valueBuffer.writeUInt32BE(value);
+        if (this.value >> 7 === 1) { // eslint-disable-line no-bitwise
+          valueBuffer = hexBuffer(`00${this.value.toString(16)}`);
+          break;
+        } else if (this.value >> 15 === 1) { // eslint-disable-line no-bitwise
+          valueBuffer = hexBuffer(`0000${this.value.toString(16)}`);
+          break;
+        } else if (this.value >> 15 === 1) { // eslint-disable-line no-bitwise
+          valueBuffer = hexBuffer(`00000000${this.value.toString(16)}`);
+          break;
         }
+        valueBuffer = hexBuffer(this.value.toString(16));
         break;
       }
       case RESOURCE_TYPE.FLOAT: {
         valueBuffer = Buffer.alloc(4);
-        valueBuffer.writeFloatBE(value);
+        valueBuffer.writeFloatBE(this.value);
         break;
       }
       case RESOURCE_TYPE.BOOLEAN: {
-        hexBool = value ? '01' : '00';
+        hexBool = this.value ? '01' : '00';
         valueBuffer = Buffer.from(hexBool, 'hex');
         break;
       }
       case RESOURCE_TYPE.STRING: {
-        valueBuffer = Buffer.from(value, 'ascii');
+        valueBuffer = Buffer.from(this.value, 'ascii');
         break;
       }
       case RESOURCE_TYPE.OPAQUE: {
-        valueBuffer = value;
+        valueBuffer = this.value;
         break;
       }
       default: {
         // Failed to specify type!
-        valueBuffer = Buffer.from(value.toString(16), 'hex');
+        valueBuffer = Buffer.from(this.value.toString(16), 'hex');
       }
     }
     return valueBuffer;
