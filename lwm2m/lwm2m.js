@@ -59,6 +59,10 @@ function changeBufferSize(buffer, start, end = buffer.length) {
   return Buffer.from(bufferArray);
 }
 
+function findDictionaryByValue(dictionaryList, keyName, value) {
+  return dictionaryList.find(dictionary => (dictionary[keyName] === value));
+}
+
 function encodeResourceValue(resource) {
   const buffer = Buffer.alloc(4); // Variable is used only in float conversion
 
@@ -398,16 +402,6 @@ function decodeResourceTLV(buffer, resource) {
   };
 }
 
-function findResourceDescription(objectInstance, resourceIdentifier) {
-  return objectInstance.resources
-    .find(resource => (resource.identifier === resourceIdentifier));
-}
-
-function findObjectInstanceDescription(object, objectInstanceIdentifier) {
-  return object.objectInstances
-    .find(objectInstances => (objectInstances.identifier === objectInstanceIdentifier));
-}
-
 function decodeObjectInstanceTLV(buffer, objectInstance) {
   const decodedObjectInstance = decodeTLV(buffer);
   const decodedResources = [];
@@ -421,7 +415,7 @@ function decodeObjectInstanceTLV(buffer, objectInstance) {
     remainingBuffer = changeBufferSize(decodedObjectInstance.value, index);
     resourceIdentifier = decodeTLV(remainingBuffer).identifier;
 
-    resourceDescription = findResourceDescription(objectInstance, resourceIdentifier);
+    resourceDescription = findDictionaryByValue(objectInstance.resources, 'identifier', resourceIdentifier);
 
     if (resourceDescription === undefined) {
       throw Error(`No resource description found (x/${objectInstance.identifier}/${resourceIdentifier})`);
@@ -451,7 +445,7 @@ function decodeObjectTLV(buffer, object) {
     remainingBuffer = changeBufferSize(buffer, index);
     objectInstanceIdentifier = decodeTLV(remainingBuffer).identifier;
 
-    objectInstanceDescription = findObjectInstanceDescription(object, objectInstanceIdentifier);
+    objectInstanceDescription = findDictionaryByValue(object.objectInstances, 'identifier', objectInstanceIdentifier);
 
     if (objectInstanceDescription === undefined) {
       throw Error(`No object instance description found (/${object.identifier}/${objectInstanceIdentifier})`);
@@ -471,6 +465,7 @@ function decodeObjectTLV(buffer, object) {
 module.exports = {
   TYPE,
   RESOURCE_TYPE,
+  findDictionaryByValue,
   encodeTLV,
   decodeTLV,
   encodeResourceValue,
