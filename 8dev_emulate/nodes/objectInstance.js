@@ -1,6 +1,6 @@
 'use strict';
 
-const { Lwm2m } = require('../../index.js');
+const Lwm2m = require('../../lwm2m/index.js');
 const { Resource } = require('./resourceInstance.js');
 const getDictionaryByValue = Lwm2m.TLV.getDictionaryByValue;
 
@@ -16,6 +16,7 @@ class ObjectInstance {
   }
 
   createResource(description) {
+    console.log('Adding new resource', description.identifier);
     let resource = this.getResource(description.identifier);
 
     if (resource === undefined) {
@@ -28,6 +29,7 @@ class ObjectInstance {
     if (resource.value instanceof Array) {
       resource.value.push(description.value);
     } else {
+      console.log('Changed from resource to multiple resources', description.identifier);
       resource.value = [resource.value, description.value];
     }
 

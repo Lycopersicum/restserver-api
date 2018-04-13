@@ -1,7 +1,7 @@
 'use strict';
 
 const EventEmitter = require('events');
-const { Lwm2m } = require('../../index.js');
+const Lwm2m = require('../../lwm2m/index.js');
 const RESOURCE_TYPE = Lwm2m.TLV.RESOURCE_TYPE;
 
 function hexBuffer(hexadecimalString) {

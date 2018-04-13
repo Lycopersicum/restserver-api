@@ -4,7 +4,7 @@ const coap = require('coap');
 const EventEmitter = require('events');
 const { ObjectInstance } = require('./objectInstance.js');
 const { Resource } = require('./resourceInstance.js');
-const { Lwm2m } = require('../../index.js');
+const Lwm2m = require('../../lwm2m/index.js');
 
 const getDictionaryByValue = Lwm2m.TLV.getDictionaryByValue;
 const DATE = new Date();
