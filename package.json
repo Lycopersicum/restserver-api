@@ -4,7 +4,7 @@
   "description": "8devices sensor network REST server API and demo",
   "main": "index.js",
   "scripts": {
-    "test": "mocha tests/*.test.js"
+    "test": "istanbul cover node_modules/mocha/bin/_mocha tests/*.test.js && codecov"
   },
   "repository": {
     "type": "git",
@@ -26,6 +26,8 @@
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.9.0",
     "mocha": "^5.0.4",
-    "nock": "^9.2.3"
+    "nock": "^9.2.3",
+    "istanbul": "^0.4.5",
+    "codecov": "^3.0.0"
   }
 }
