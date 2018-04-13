@@ -1,5 +1,3 @@
-'use strict';
-
 const {
   Sensor3700,
   Sensor3800,
