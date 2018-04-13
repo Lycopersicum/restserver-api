@@ -2,13 +2,25 @@
 
 const coap = require('coap');
 const EventEmitter = require('events');
-const ObjectInstance = require('./objectInstance.js');
-const { RESOURCE_TYPE } = require('./resourceInstance.js');
+const { ObjectInstance } = require('./objectInstance.js');
+const { Resource } = require('./resourceInstance.js');
+const { Lwm2m } = require('../../index.js');
 
+const getDictionaryByValue = Lwm2m.TLV.getDictionaryByValue;
 const DATE = new Date();
 const LWM2M_VERSION = '1.0';
 
 coap.registerFormat('application/vnd.oma.lwm2m+tlv', 11542);
+
+function getIndexByValue(dictionaryList, key, value) {
+  // Return dictionary list index of dictionary that has 'key' with matching 'value'
+  for (let index = 0; index < dictionaryList.length; index += 1) {
+    if (dictionaryList[key] === value) {
+      return index;
+    }
+  }
+  return -1;
+}
 
 function Interval(callback, delay) {
   var iterator = setInterval(callback, delay);
@@ -45,7 +57,8 @@ class ClientNodeInstance extends EventEmitter {
     super();
 
     this._state = 'stopped';
-    this.objects = {};
+    this.objects = [];
+    this._objects = []; // Hidden objects
     this.updatesIterator = {};
     this.observedResources = {};
     this.registrationPath = '/rd';
@@ -87,121 +100,266 @@ class ClientNodeInstance extends EventEmitter {
     }
   }
 
-  createObject(objectID, instanceID, hidden) {
-    this.objects[`${objectID}/${instanceID}`] = new ObjectInstance(objectID, instanceID, hidden);
+  getObject(objectID, hidden) {
+    const objects = hidden ? this._objects : this.objects;
+
+    return getDictionaryByValue(objects, 'identifier', objectID);
   }
 
-  addResource(objectID, instanceID, resourceID, access, type, handler) {
-    this.objects[`${objectID}/${instanceID}`].addResource(resourceID, access, type, handler);
+  getObjectInstance(objectID, objectInstanceID, hidden) {
+    const object = this.getObject(objectID, hidden);
+
+    return getDictionaryByValue(object.objectInstances, 'identifier', objectInstanceID);
+  }
+
+  getResource(objectID, objectInstanceID, resourceID, hidden) {
+    const objectInstance = this.getObjectInstance(objectID, objectInstanceID, hidden);
+
+    return objectInstance.getResource(resourceID);
+  }
+
+  createObjectInstance(objectID, hidden) {
+    const objects = hidden ? this._objects : this.objects;
+    let object = this.getObject(objectID);
+    let newObjectInstance;
+
+    if (object === undefined) {
+      objects.push({
+        identifier: objectID,
+        objectInstances: [],
+      });
+
+      object = objects[objects.length - 1];
+    }
+
+    newObjectInstance = new ObjectInstance({
+      identifier: object.objectInstances.length,
+      hidden: hidden,
+    });
+
+    object.objectInstances.push(newObjectInstance);
+
+    return newObjectInstance;
   }
 
   getObjectInstancesList() {
     const objectInstancesList = [];
-    for (const key in this.objects) {
-      if (this.objects[key].hidden === true) {
-        continue;
-      }
-      if (Object.prototype.hasOwnProperty.call(this.objects, key)) {
-        objectInstancesList.push(`<${key}>`);
+    let object;
+
+    for(let objectIndex = 0; objectIndex < this.objects.length; objectIndex += 1) {
+      object = this.objects[objectIndex];
+      for(let objectInstance = 0; objectInstance < object.objectInstances.length; objectInstance += 1) {
+        objectInstancesList.push(`</${object.identifier}/${objectInstance}>`);
       }
     }
- 
+
     return objectInstancesList;
   }
 
   initiateSecurityObject(serverURI, clientPSK = null, publicKey = null, serverRPK = null, secretKey = null) {
-    this.createObject(0, 0, true);
+    const newSecurityObject = this.createObjectInstance(0, true);
     // LwM2M Server URI
-    this.objects['0/0'].addResource(0, '', RESOURCE_TYPE.STRING, serverURI);
+    newSecurityObject.createResource({
+      identifier: 0,
+      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      value: serverURI,
+    });
     // Bootstrap Server
-    this.objects['0/0'].addResource(1, '', RESOURCE_TYPE.BOOLEAN, false);
+    newSecurityObject.createResource({
+      identifier: 1,
+      type: Lwm2m.TLV.RESOURCE_TYPE.BOOLEAN,
+      value: false,
+    });
     // Security Mode (0-4). 3 if NoSec, 0 if PSK
-    this.objects['0/0'].addResource(2, '', RESOURCE_TYPE.INTEGER, clientPSK === null ? 3 : 0);
+    newSecurityObject.createResource({
+      identifier: 2,
+      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      value: (clientPSK === null ? 3 : 0),
+    });
     // Public Key or Identity
-    this.objects['0/0'].addResource(3, '', RESOURCE_TYPE.OPAQUE, publicKey);
+    newSecurityObject.createResource({
+      identifier: 3,
+      type: Lwm2m.TLV.RESOURCE_TYPE.OPAQUE,
+      value: publicKey,
+    });
     // Server Public Key
-    this.objects['0/0'].addResource(4, '', RESOURCE_TYPE.OPAQUE, serverRPK);
+    newSecurityObject.createResource({
+      identifier: 4,
+      type: Lwm2m.TLV.RESOURCE_TYPE.OPAQUE,
+      value: serverRPK,
+    });
     // Secret Key
-    this.objects['0/0'].addResource(5, '', RESOURCE_TYPE.OPAQUE, secretKey);
+    newSecurityObject.createResource({
+      identifier: 5,
+      type: Lwm2m.TLV.RESOURCE_TYPE.OPAQUE,
+      value: secretKey,
+    });
   }
 
   initiateServerObject(lifetime, queueMode, minimumPeriod = 0, maximumPeriod = 60) {
+    const newServerObject = this.createObjectInstance(1);
     let bindingMode = 'U';
     bindingMode += queueMode ? 'Q' : '';
-    this.createObject(1, 0);
+
     // Short Server ID
-    this.objects['1/0'].addResource(0, 'R', RESOURCE_TYPE.INTEGER, 1);
+    newServerObject.createResource({
+      identifier: 0,
+      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      value: 1,
+      permissions: 'R',
+    });
     // Lifetime
-    this.objects['1/0'].addResource(1, 'RW', RESOURCE_TYPE.INTEGER, lifetime);
+    newServerObject.createResource({
+      identifier: 1,
+      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      value: lifetime,
+      permissions: 'RW',
+    });
     // Default Minimum Period
-    this.objects['1/0'].addResource(2, 'RW', RESOURCE_TYPE.INTEGER, minimumPeriod);
+    newServerObject.createResource({
+      identifier: 2,
+      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      value: minimumPeriod,
+      permissions: 'RW',
+    });
     // Default Maximum Period
-    this.objects['1/0'].addResource(3, 'RW', RESOURCE_TYPE.INTEGER, maximumPeriod);
+    newServerObject.createResource({
+      identifier: 3,
+      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      value: maximumPeriod,
+      permissions: 'RW',
+    });
     // Notification Storing When Disabled or Offline
-    this.objects['1/0'].addResource(6, 'RW', RESOURCE_TYPE.BOOLEAN, true);
+    newServerObject.createResource({
+      identifier: 6,
+      type: Lwm2m.TLV.RESOURCE_TYPE.BOOLEAN,
+      value: true,
+      permissions: 'RW',
+    });
     // Binding
-    this.objects['1/0'].addResource(7, 'RW', RESOURCE_TYPE.STRING, bindingMode);
+    newServerObject.createResource({
+      identifier: 7,
+      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      value: bindingMode,
+      permissions: 'RW',
+    });
     // Registration Update Trigger
-    this.objects['1/0'].addResource(8, 'E', RESOURCE_TYPE.NONE, () => {
-      this.updateHandler();
+    newServerObject.createResource({
+      identifier: 8,
+      type: Lwm2m.TLV.RESOURCE_TYPE.NONE,
+      value: () => {
+        this.updateHandle();
+      },
+      permissions: 'E',
     });
   }
 
   initiateAccessControlObject() {
-    // TODO: Add mandatory Resources to Access Control Object
-    this.createObject(2, 0);
+    const newAccessControlObject = this.createObjectInstance(2);
   }
 
   initiateDeviceObject(manufacturer, model, queueMode) {
+    const newDeviceObject = this.createObjectInstance(3);
     let bindingMode = 'U';
+
     bindingMode += queueMode ? 'Q' : '';
-    this.createObject(3, 0);
-    this.objects['3/0'].addResource(0, 'R', RESOURCE_TYPE.STRING, manufacturer);
-    this.objects['3/0'].addResource(1, 'R', RESOURCE_TYPE.STRING, model);
-    this.objects['3/0'].addResource(16, 'R', RESOURCE_TYPE.STRING, bindingMode);
+
+    newDeviceObject.createResource({
+      identifier: 0,
+      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      value: manufacturer,
+      permissions: 'R',
+    });
+    newDeviceObject.createResource({
+      identifier: 1,
+      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      value: model,
+      permissions: 'R',
+    });
+    newDeviceObject.createResource({
+      identifier: 16,
+      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      value: bindingMode,
+      permissions: 'R',
+    });
   }
+
   initiateConnectivityMonitoringObject() {
-    this.createObject(4, 0);
+    const newConnectivityMonitoringObject = this.createObjectInstance(4);
   }
+
   initiateFirmwareObject() {
-    this.createObject(5, 0);
+    const newFirmwareObject = this.createObjectInstance(5);
   }
+
   initiateLocationObject() {
-    this.createObject(6, 0);
+    const newLocationObject = this.createObjectInstance(6);
   }
+
   initiateConnectivityStatisticsObject() {
-    this.createObject(7, 0);
+    const newConnectivityStatisticsObject = this.createObjectInstance(7);
   }
 
   requestGet(response, addressArray, observation) {
-    const objectInstance = addressArray.slice(0, 2).join('/');
+    let object;
+    let decodedObject
+    let objectInstance;
+    let decodedObjectInstance
+    let resource;
+    let decodedResource;
+    let resourceInstance;
+    let decodedResourceInstance;
+    let responsePayload;
+
     response._packet.ack = true;
 
     switch (addressArray.length) {
       case 1: {
-        // TODO: Add handlers for objects reading
-        response.statusCode = '4.06';
+        object = this.getObject(addressArray[0]);
+        if (object === undefined) {
+          response.statusCode = '4.04';
+          break;
+        }
+
+        response.write(Lwm2m.TLV.encodeObject(object));
+        response.statusCode = '2.05';
         break;
       } 
       case 2: {
-        // TODO: Add handlers for object instances reading
-        response.statusCode = '4.06';
+        objectInstance = this.getObjectInstance(addressArray[0], addressArray[1]);
+        if (objectInstance === undefined) {
+          response.statusCode = '4.04';
+          break;
+        }
+
+        response.write(Lwm2m.TLV.encodeObjectInstance(objectInstance));
+        response.statusCode = '2.05';
         break;
       } 
       case 3: {
-        // TODO: Add handlers for resources reading
-        if (this.objects[objectInstance] instanceof ObjectInstance) {
-          response.statusCode = this.objects[objectInstance].getResourceTLV(addressArray[2], (buffer) => {
-            response.write(buffer);
-          });
-        } else {
+        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
+        if (resource === undefined) {
           response.statusCode = '4.04';
+          break;
         }
+
+        response.write(Lwm2m.TLV.encodeResource(resource));
+        response.statusCode = '2.05';
         break;
       } 
       case 4: {
-        // TODO: Add handlers for resource instances reading
-        response.statusCode = '4.00';
+        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
+        if (resource === undefined) {
+          response.statusCode = '4.04';
+          break;
+        }
+
+        response.write(Lwm2m.TLV.encodeResourceInstance({
+          type: resource.type,
+          identifier: addressArray[3],
+          value: resource.value[addressArray[3]],
+        }));
+        response.statusCode = '2.05';
         break;
       }
       default: {
@@ -214,32 +372,128 @@ class ClientNodeInstance extends EventEmitter {
     }
   }
 
+  putResourceInstance(resource, description) {
+    if (!(resource instanceof Resource)) {
+      return '4.04'
+    }
+
+    if (!(resource.value instanceof Array)) {
+      return '4.04'
+    }
+
+    if (resource.value.length <= description.identifier) {
+      return '4.04'
+    }
+
+    if (resource.type !== description.type) {
+      throw Error('Resource type mismatch on write');
+    }
+
+    resource[description.identifier] = description.value;
+
+    return '2.04';
+  }
+
+  putResource(resource, description) {
+    if (!(resource instanceof Resource)) {
+      return '4.04'
+    }
+
+    if (resource.identifier !== description.identifier) {
+      throw Error('Resource identifier mismatch on write');
+    }
+
+    if (resource.type !== description.type) {
+      throw Error('Resource type mismatch on write');
+    }
+
+    return resource.writeValue(description.value);
+  }
+
+  putObjectInstance(objectInstance, description) {
+    let resource;
+    let responseCode;
+
+    if (!(objectInstance instanceof ObjectInstance)) {
+      return '4.04';
+    }
+
+    if (objectInstance.identifier !== description.identifier) {
+      throw Error('Object instance identifier mismatch on write');
+    }
+
+    for (let index = 0; index < objectInstance.resources.length; index += 1) {
+      resource = objectInstance.getResource(objectInstance.resources[index].identifier);
+
+      responseCode = putResource(resource, objectInstance.resources[index])
+      if (responseCode !== '2.04') {
+        return responseCode;
+      }
+    }
+    return '2.04'
+  }
+
+  putObject(object, description) {
+    let objectInstance;
+    let responseCode;
+
+    if (object === undefined) {
+      return '4.04'
+    }
+
+    if (object.identifier !== description.identifier) {
+      throw Error('Object identifier mismatch on write');
+    }
+
+    for (let index = 0; index < object.objectInstances.length; index += 1) {
+      objectInstance = this.getObjectInstance(object.identifier, index);
+      responseCode = putObjectInstance(objectInstance, object.objectInstances[index])
+      if (responseCode !== '2.04') {
+        return responseCode;
+      }
+    }
+    return '2.04'
+  }
+
   requestPut(response, addressArray, payload) {
-    const objectInstance = addressArray.slice(0, 2).join('/');
+    let object;
+    let decodedObject
+    let objectInstance;
+    let decodedObjectInstance
+    let resource;
+    let decodedResource;
+    let resourceInstance;
+    let decodedResourceInstance;
+
     response._packet.ack = true;
 
     switch (addressArray.length) {
       case 1: {
-        // TODO: Add handlers for objects reading
-        response.statusCode = '4.06';
+        object = this.getObject(addressArray[0]);
+        decodedObject = Lwm2m.TLV.decodeObject(payload, object);
+
+        response.statusCode = this.putObject(object, decodedObject);
         break;
       }
       case 2: {
-        // TODO: Add handlers for object instances reading
-        response.statusCode = '4.06';
+        objectInstance = this.getObjectInstance(addressArray[0], addressArray[1]);
+        decodedObjectInstance = Lwm2m.TLV.decodeObjectInstance(payload, objectInstance);
+
+        response.statusCode = this.putObjectInstance(objectInstance, decodedObjectInstance);
         break;
       }
       case 3: {
-        if (this.objects[objectInstance] instanceof ObjectInstance) {
-          response.statusCode = this.objects[objectInstance].writeFromTLV(payload);
-        } else {
-          response.statusCode = '4.04';
-        }
+        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
+        decodedResource = Lwm2m.TLV.decodeResource(payload, resource);
+
+        response.statusCode = this.putResource(resource, decodedResource);
         break;
       }
       case 4: {
-        // TODO: Add handlers for resource instances reading
-        response.statusCode = '4.00';
+        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
+        decodedResourceInstance = Lwm2m.TLV.decodeResourceInstance(payload, resource);
+
+        response.statusCode = this.putResourceInstance(resource, decodedResourceInstance);
         break;
       }
       default: {
@@ -250,7 +504,8 @@ class ClientNodeInstance extends EventEmitter {
   }
 
   requestPost(response, addressArray) {
-    const objectInstance = addressArray.slice(0, 2).join('/');
+    let resource;
+
     response._packet.ack = true;
 
     switch (addressArray.length) {
@@ -263,11 +518,9 @@ class ClientNodeInstance extends EventEmitter {
         break;
       }
       case 3: {
-        if (this.objects[objectInstance] instanceof ObjectInstance) {
-          response.statusCode = this.objects[objectInstance].executeResource(addressArray[2]);
-        } else {
-          response.statusCode = '4.04';
-        }
+        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
+
+        response.statusCode = resource.execute();
         break;
       }
       case 4: {
@@ -282,17 +535,17 @@ class ClientNodeInstance extends EventEmitter {
   }
 
   requestDelete(response, addressArray) {
-    // TODO: Add handlers for resource deletion
+    // TODO: Add handles for resource deletion
     response.end()
   }
 
   getQueryString() {
     return [
       `ep=${this.endpointClientName}`,
-      `lt=${this.objects['1/0'].resources['1'].value}`,
+      `lt=${this.getResource(1, 0, 1).value}`,
       `lwm2m=${LWM2M_VERSION}`,
-      `b=${this.objects['1/0'].resources['7'].value}`,
-      `et=${this.objects['3/0'].resources['1'].value}`,
+      `b=${this.getResource(1, 0, 7).value}`,
+      `et=${this.getResource(3, 0, 1).value}`,
     ].join('&');
   }
 
@@ -303,11 +556,11 @@ class ClientNodeInstance extends EventEmitter {
       updateOptions.pathname = updatesPath;
 
       if (updateLifetime) {
-        queryOptions.push(`lt=${this.objects['1/0'].resources['1'].value}`);
+        queryOptions.push(`lt=${this.getResource(1, 0, 1).value}`);
       }
 
       if (updateBinding) {
-        queryOptions.push(`b=${this.objects['1/0'].resources['7'].value}`);
+        queryOptions.push(`b=${this.getResource(1, 0, 7).value}`);
       }
 
       if (queryOptions.length > 0) {
@@ -357,7 +610,7 @@ class ClientNodeInstance extends EventEmitter {
     }
   }
 
-  updateHandler(updatesPath) {
+  updateHandle(updatesPath) {
     if (updatesPath === undefined) {
       for (let path in this.updatesIterator) {
         this.update(path)
@@ -375,6 +628,8 @@ class ClientNodeInstance extends EventEmitter {
 
   startObservation(addressArray, notification) {
     const objectInstance = addressArray.slice(0, 2).join('/');
+    let resource;
+
     notification._packet.ack = false;
     notification._packet.confirmable = true;
 
@@ -387,60 +642,66 @@ class ClientNodeInstance extends EventEmitter {
 
     switch (addressArray.length) {
       case 1: {
-        // TODO: Add handlers for objects observation
+        // TODO: Add handles for objects observation
         break;
       } 
       case 2: {
-        // TODO: Add handlers for object instances observation
+        // TODO: Add handles for object instances observation
         break;
       } 
       case 3: {
-        if (this.observedResources[addressArray.join('/')] === undefined &&
-          this.objects[objectInstance] instanceof ObjectInstance) {
+        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
+
+        function changeListener() {
+          if (this.observedResources[addressArray.join('/')] instanceof Interval) {
+            this.observedResources[addressArray.join('/')].skip();
+          }
+        };
+
+        if (
+          this.observedResources[addressArray.join('/')] === undefined
+          && resource instanceof Resource
+        ) {
           this.observedResources[addressArray.join('/')] = new Interval(() => {
-            this.objects[objectInstance].resources[addressArray[2]].getTLVBuffer((buffer) => {
-              notification.write(buffer);
-            });
-          }, this.objects['1/0'].getResourceValue('3') * 1000 );
-          if (this.objects[objectInstance].resources[addressArray[2]].notifyOnChange) {
-            this.objects[objectInstance].resources[addressArray[2]].on('change', () => {
-              // TODO: Implement minimum period of observation
-              if (this.observedResources[addressArray.join('/')] instanceof Interval) {
-                this.observedResources[addressArray.join('/')].skip();
-              }
-            });
+            notification.write(Lwm2m.TLV.encodeResource(resource));
+          }, this.getResource(1, 0, 3).value * 1000 );
+
+          if (resource.notifyOnChange) {
+            resource.on('change', changeListener);
           }
         }
+
         break;
       }
       case 4: {
-        // TODO: Add handlers for resource instances observation
+        // TODO: Add handles for resource instances observation
         break;
       }
       default: {
-        // TODO: Add handler for bad observation requests
+        // TODO: Add handle for bad observation requests
       }
     }
   }
 
   stopObservation(addressArray) {
-    const objectInstance = addressArray.slice(0, 2).join('/');
     switch (addressArray.length) {
       case 1: {
-        // TODO: Add handlers for objects observation cancelling
+        // TODO: Add handles for objects observation cancelling
         break;
       } 
       case 2: {
-        // TODO: Add handlers for object instances observation cancelling
+        // TODO: Add handles for object instances observation cancelling
         break;
       } 
       case 3: {
+        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
+
         this.observedResources[addressArray.join('/')].stop();
         delete this.observedResources[addressArray.join('/')];
         break;
       } 
       case 4: {
-        // TODO: Add handlers for resource instances observation cancelling
+        // TODO: Add handles for resource instances observation cancelling
         break;
       }
       default: {
@@ -489,7 +750,7 @@ class ClientNodeInstance extends EventEmitter {
     this.emit('deregister', registrationPath);
   }
 
-  deregistrationHandler(updatesPath) {
+  deregistrationHandle(updatesPath) {
     return new Promise((deregistered, failed) => {
       const deregistrationOptions = Object.assign({}, this.requestOptions);
       deregistrationOptions.method = 'DELETE';
@@ -546,7 +807,7 @@ class ClientNodeInstance extends EventEmitter {
       this.register(registrationPath)
       .then((updatesPath) => {
         this.on('deregister', () => {
-          this.deregistrationHandler(updatesPath);
+          this.deregistrationHandle(updatesPath);
         });
 
         this.on('update-failed', (reason) => {
@@ -574,7 +835,7 @@ class ClientNodeInstance extends EventEmitter {
               .catch((error) => {
                 this.emit('error', error);
               });
-            }, this.objects['1/0'].resources['1'].value);
+            }, this.getResource(1, 0, 1).value);
         }
       });
     });
@@ -592,7 +853,7 @@ class ClientNodeInstance extends EventEmitter {
     const addressArray = [];
     for (let i = 0; i < request.options.length; i += 1) {
       if (request.options[i].name === 'Uri-Path') {
-        addressArray.push(request.options[i].value.toString());
+        addressArray.push(Number(request.options[i].value));
       }
     }
 

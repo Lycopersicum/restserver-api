@@ -1,111 +1,76 @@
 'use strict';
 
-const lwm2m = require('./lwm2m.js');
-const { RESOURCE_TYPE, ResourceInstance } = require('./resourceInstance.js');
+const { Lwm2m } = require('../../index.js');
+const { Resource } = require('./resourceInstance.js');
+const getDictionaryByValue = Lwm2m.TLV.getDictionaryByValue;
 
 class ObjectInstance {
-  constructor(objectID, instanceID, hidden = false) {
-    this.objectID = objectID;
-    this.instanceId = instanceID;
-    this.hidden = hidden;
-    this.resources = {};
+  constructor(description) {
+    this.identifier = description.identifier;
+    this.hidden = description.hidden === undefined ? false : description.hidden;
+    this.resources = [];
   }
 
-  addResource(identifier, permissions, type, value, handler, notifyOnChange) {
-    // TODO: Add implementation for multiple instance resources.
-    this.resources[`${identifier}`] = new ResourceInstance(identifier, permissions, type, value, handler, notifyOnChange);
+  getResource(identifier) {
+    return getDictionaryByValue(this.resources, 'identifier', identifier);
+  }
+
+  createResource(description) {
+    let resource = this.getResource(description.identifier);
+
+    if (resource === undefined) {
+      resource = new Resource(description);
+      this.resources.push(resource);
+
+      return resource;
+    }
+
+    if (resource.value instanceof Array) {
+      resource.value.push(description.value);
+    } else {
+      resource.value = [resource.value, description.value];
+    }
+
+    return resource;
   }
 
   writeResource(identifier, value, force = false) {
-    return this.resources[identifier].writeValue(value, force);
+    const resource = getResource(identifier);
+
+    return resource.writeValue(value, force);
   }
 
   deleteResource(identifier, force = false) {
-    return this.resources[identifier].deleteResource(force);
+    const resource = getResource(identifier);
+
+    return resource.deleteResource(force);
   }
 
   executeResource(identifier, force = false) {
-    return this.resources[identifier].executeResource(force);
+    const resource = getResource(identifier);
+
+    return resource.executeResource(force);
   }
 
   getResourceValue(identifier, callback) {
-    if (typeof callback !== 'function') {
-      return this.resources[identifier].value;
-    }
-    callback(this.resources[identifier].value);
+    const resource = getResource(identifier);
+
+    return resource.value;
   }
 
   observeResource(identifier, handler) {
-    this.resources[identifier].addObservationHandler(handler);
+    const resource = getResource(identifier);
+
+    return resource.addObservationHandler(handler);
   }
 
   unobserveResource(identifier) {
-    this.resources[identifier].deleteObservationHandler();
-  }
+    const resource = getResource(identifier);
 
-  getResourceTLV(identifier, callback) {
-    return this.resources[identifier].getTLVBuffer(callback);
-  }
-
-  getAllResourcesTLV() {
-    // TODO: Review and change iterating through dictionary (not array anymore)
-    const allBuffers = [];
-    for (let iterator = 0; iterator < this.resources.length; iterator += 1) {
-      allBuffers.push(this.resources[iterator].getTLV());
-    }
-    return Buffer.concat(allBuffers);
-  }
-
-  writeFromTLV(payload) {
-    const resourcesList = lwm2m.parseTLV(payload);
-    let value;
-
-    if (resourcesList[0].getType() === lwm2m.TYPE_RESOURCE) {
-      if (this.resources[`${resourcesList[0].getIdentifier()}`] === undefined) {
-        return '4.04';
-      }
-
-      switch (this.resources[`${resourcesList[0].getIdentifier()}`].type) {
-        case RESOURCE_TYPE.NONE: {
-          if (resourcesList[0].valueLength !== 0) {
-            return '4.00';
-          }
-          value = undefined;
-          break;
-        }
-
-        case RESOURCE_TYPE.BOOLEAN: {
-          value = resourcesList[0].getBooleanValue();
-          break;
-        }
-
-        case RESOURCE_TYPE.INTEGER: {
-          value = resourcesList[0].getIntegerValue();
-          break;
-        }
-
-        case RESOURCE_TYPE.FLOAT: {
-          value = resourcesList[0].getFloatValue();
-          break;
-        }
-
-        case RESOURCE_TYPE.STRING: {
-          value = resourcesList[0].getStringValue();
-          break;
-        }
-
-        case RESOURCE_TYPE.OPAQUE: {
-          value = resourcesList[0].binaryValue;
-          break;
-        }
-
-        default: {
-          return '5.00';
-        }
-      }
-      return this.writeResource(`${resourcesList[0].getIdentifier()}`, value)
-    }
+    return resource.deleteObservationHandler();
   }
 }
 
-module.exports = ObjectInstance;
+module.exports = {
+  ObjectInstance,
+};
