@@ -344,7 +344,22 @@ function decodeTLV(buffer) {
   };
 }
 
-function decodeResourceInstanceTLV(buffer, resourceInstance) {
+function decodeResourceInstanceTLV(buffer, resources) {
+  const decodedResourceInstance = decodeTLV(buffer);
+
+  if (decodedResourceInstance.type !== TYPE.RESOURCE_INSTANCE) {
+    throw Error('Decoded resource TLV identifier and description identifiers do not match');
+  }
+
+  return {
+    type: resources.type,
+    identifier: decodedResourceInstance.identifier,
+    value: decodeResourceValue(decodedResourceInstance.value, resources),
+    tlvSize: decodedResourceInstance.tlvSize,
+  };
+}
+
+function decodeResourceInstanceValue(buffer, resourceInstance) {
   const decodedResourceInstance = decodeTLV(buffer);
 
   if (decodedResourceInstance.type !== TYPE.RESOURCE_INSTANCE) {
@@ -363,7 +378,7 @@ function decodeMultipleResourceInstancesTLV(buffer, resources) {
   let index = 0;
 
   while (index < buffer.length) {
-    decodedResourceInstance = decodeResourceInstanceTLV(
+    decodedResourceInstance = decodeResourceInstanceValue(
       changeBufferSize(buffer, index),
       resources,
     );
@@ -472,6 +487,7 @@ module.exports = {
   decodeResourceValue,
   encodeResourceTLV,
   decodeResourceTLV,
+  decodeResourceInstanceTLV,
   encodeObjectInstanceTLV,
   decodeObjectInstanceTLV,
   encodeObjectTLV,

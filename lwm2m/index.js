@@ -8,6 +8,7 @@ module.exports.TLV = {
   decode: lwm2m.decodeTLV,
   encodeResource: lwm2m.encodeResourceTLV,
   decodeResource: lwm2m.decodeResourceTLV,
+  decodeResource: lwm2m.decodeResourceInstanceTLV,
   encodeResourceValue: lwm2m.encodeResourceValue,
   decodeResourceValue: lwm2m.decodeResourceValue,
   encodeObjectInstance: lwm2m.encodeObjectInstanceTLV,
