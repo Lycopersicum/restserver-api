@@ -1,64 +1,114 @@
-'use strict';
-
 const coap = require('coap');
 const EventEmitter = require('events');
 const { ObjectInstance } = require('./objectInstance.js');
 const { Resource } = require('./resourceInstance.js');
-const Lwm2m = require('../../lwm2m/index.js');
+const { TLV } = require('../../lwm2m/index.js');
 
-const getDictionaryByValue = Lwm2m.TLV.getDictionaryByValue;
-const DATE = new Date();
+const { getDictionaryByValue } = TLV;
 const LWM2M_VERSION = '1.0';
 
 coap.registerFormat('application/vnd.oma.lwm2m+tlv', 11542);
 
-function getIndexByValue(dictionaryList, key, value) {
-  // Return dictionary list index of dictionary that has 'key' with matching 'value'
-  for (let index = 0; index < dictionaryList.length; index += 1) {
-    if (dictionaryList[key] === value) {
-      return index;
-    }
-  }
-  return -1;
-}
-
 function Interval(callback, delay) {
-  var iterator = setInterval(callback, delay);
+  let iterator = setInterval(callback, delay);
 
-  this.stop = function() {
+  this.stop = function () {
     if (iterator) {
       clearInterval(iterator);
       iterator = null;
     }
     return this;
-  }
+  };
 
-  this.start = function() {
+  this.start = function () {
     if (!iterator) {
       this.stop();
       iterator = setInterval(callback, delay);
     }
     return this;
-  }
+  };
 
-  this.reset = function(newDelay) {
-    delay = newDelay !== undefined ? newDelay : delay;
+  this.reset = function (newDelay) {
+    delay = newDelay !== undefined ? newDelay : delay; // eslint-disable-line no-param-reassign
     return this.stop().start();
+  };
+
+  this.skip = function (newDelay) {
+    callback();
+    return this.reset(newDelay);
+  };
+}
+
+function putResourceInstance(resourceObject, description) {
+  const resource = resourceObject;
+
+  if (!(resource instanceof Resource)) {
+    return '4.04';
   }
 
-  this.skip = function(newDelay) {
-    callback();
-    return this.reset();
+  if (!(resource.value instanceof Array)) {
+    return '4.04';
   }
+
+  if (resource.value.length <= description.identifier) {
+    return '4.04';
+  }
+
+  if (resource.type !== description.type) {
+    throw Error('Resource type mismatch on write');
+  }
+
+  resource[description.identifier] = description.value;
+
+  return '2.04';
+}
+
+function putResource(resource, description) {
+  if (!(resource instanceof Resource)) {
+    return '4.04';
+  }
+
+  if (resource.identifier !== description.identifier) {
+    throw Error('Resource identifier mismatch on write');
+  }
+
+  if (resource.type !== description.type) {
+    throw Error('Resource type mismatch on write');
+  }
+
+  return resource.writeValue(description.value);
+}
+
+function putObjectInstance(objectInstance, description) {
+  let resource;
+  let responseCode;
+
+  if (!(objectInstance instanceof ObjectInstance)) {
+    return '4.04';
+  }
+
+  if (objectInstance.identifier !== description.identifier) {
+    throw Error('Object instance identifier mismatch on write');
+  }
+
+  for (let index = 0; index < objectInstance.resources.length; index += 1) {
+    resource = objectInstance.getResource(objectInstance.resources[index].identifier);
+
+    responseCode = putResource(resource, objectInstance.resources[index]);
+    if (responseCode !== '2.04') {
+      return responseCode;
+    }
+  }
+  return '2.04';
 }
 
 class ClientNodeInstance extends EventEmitter {
   constructor(lifetime, manufacturer, model, queueMode, endpointClientName, serverURI, clientPort) {
     super();
 
-    this._state = 'stopped';
+    this._state = 'stopped'; // eslint-disable-line no-underscore-dangle
     this.objects = [];
-    this._objects = []; // Hidden objects
+    this._objects = []; // eslint-disable-line no-underscore-dangle
     this.updatesIterator = {};
     this.observedResources = {};
     this.registrationPath = '/rd';
@@ -70,7 +120,10 @@ class ClientNodeInstance extends EventEmitter {
       this.requestListener(req, res);
     });
     this.coapServer.listen(clientPort);
-    this.coapAgent = new coap.Agent({ type: 'udp6', socket: this.coapServer._sock });
+    this.coapAgent = new coap.Agent({
+      type: 'udp6',
+      socket: this.coapServer._sock, // eslint-disable-line no-underscore-dangle
+    });
     this.requestOptions = {
       host: serverURI,
       port: 5555,
@@ -91,17 +144,24 @@ class ClientNodeInstance extends EventEmitter {
     this.initiateConnectivityStatisticsObject();
   }
 
-  get state() { return this._state; }
+  get state() { return this._state; } // eslint-disable-line no-underscore-dangle
 
   set state(state) {
-    if ((this._state !== state) && ((this._state !== 'stopped') || (state === 'started'))) {
-      this._state = state;
+    if (
+      (this._state !== state) // eslint-disable-line no-underscore-dangle
+      && (
+        (this._state !== 'stopped') // eslint-disable-line no-underscore-dangle
+        || (state === 'started'))
+    ) {
+      this._state = state; // eslint-disable-line no-underscore-dangle
       this.emit('state-change', state);
     }
   }
 
   getObject(objectID, hidden) {
-    const objects = hidden ? this._objects : this.objects;
+    const objects = hidden
+      ? this._objects // eslint-disable-line no-underscore-dangle
+      : this.objects;
 
     return getDictionaryByValue(objects, 'identifier', objectID);
   }
@@ -119,9 +179,10 @@ class ClientNodeInstance extends EventEmitter {
   }
 
   createObjectInstance(objectID, hidden) {
-    const objects = hidden ? this._objects : this.objects;
-    let object = this.getObject(objectID);
-    let newObjectInstance;
+    const objects = hidden
+      ? this._objects // eslint-disable-line no-underscore-dangle
+      : this.objects;
+    let object = this.getObject(objectID, hidden);
 
     if (object === undefined) {
       objects.push({
@@ -131,10 +192,9 @@ class ClientNodeInstance extends EventEmitter {
 
       object = objects[objects.length - 1];
     }
-
-    newObjectInstance = new ObjectInstance({
+    const newObjectInstance = new ObjectInstance({
       identifier: object.objectInstances.length,
-      hidden: hidden,
+      hidden,
     });
 
     object.objectInstances.push(newObjectInstance);
@@ -146,9 +206,13 @@ class ClientNodeInstance extends EventEmitter {
     const objectInstancesList = [];
     let object;
 
-    for(let objectIndex = 0; objectIndex < this.objects.length; objectIndex += 1) {
+    for (let objectIndex = 0; objectIndex < this.objects.length; objectIndex += 1) {
       object = this.objects[objectIndex];
-      for(let objectInstance = 0; objectInstance < object.objectInstances.length; objectInstance += 1) {
+      for (
+        let objectInstance = 0;
+        objectInstance < object.objectInstances.length;
+        objectInstance += 1
+      ) {
         objectInstancesList.push(`</${object.identifier}/${objectInstance}>`);
       }
     }
@@ -156,42 +220,48 @@ class ClientNodeInstance extends EventEmitter {
     return objectInstancesList;
   }
 
-  initiateSecurityObject(serverURI, clientPSK = null, publicKey = null, serverRPK = null, secretKey = null) {
+  initiateSecurityObject(
+    serverURI,
+    clientPSK = null,
+    publicKey = null,
+    serverRPK = null,
+    secretKey = null,
+  ) {
     const newSecurityObject = this.createObjectInstance(0, true);
     // LwM2M Server URI
     newSecurityObject.createResource({
       identifier: 0,
-      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      type: TLV.RESOURCE_TYPE.STRING,
       value: serverURI,
     });
     // Bootstrap Server
     newSecurityObject.createResource({
       identifier: 1,
-      type: Lwm2m.TLV.RESOURCE_TYPE.BOOLEAN,
+      type: TLV.RESOURCE_TYPE.BOOLEAN,
       value: false,
     });
     // Security Mode (0-4). 3 if NoSec, 0 if PSK
     newSecurityObject.createResource({
       identifier: 2,
-      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      type: TLV.RESOURCE_TYPE.INTEGER,
       value: (clientPSK === null ? 3 : 0),
     });
     // Public Key or Identity
     newSecurityObject.createResource({
       identifier: 3,
-      type: Lwm2m.TLV.RESOURCE_TYPE.OPAQUE,
+      type: TLV.RESOURCE_TYPE.OPAQUE,
       value: publicKey,
     });
     // Server Public Key
     newSecurityObject.createResource({
       identifier: 4,
-      type: Lwm2m.TLV.RESOURCE_TYPE.OPAQUE,
+      type: TLV.RESOURCE_TYPE.OPAQUE,
       value: serverRPK,
     });
     // Secret Key
     newSecurityObject.createResource({
       identifier: 5,
-      type: Lwm2m.TLV.RESOURCE_TYPE.OPAQUE,
+      type: TLV.RESOURCE_TYPE.OPAQUE,
       value: secretKey,
     });
   }
@@ -204,49 +274,49 @@ class ClientNodeInstance extends EventEmitter {
     // Short Server ID
     newServerObject.createResource({
       identifier: 0,
-      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      type: TLV.RESOURCE_TYPE.INTEGER,
       value: 1,
       permissions: 'R',
     });
     // Lifetime
     newServerObject.createResource({
       identifier: 1,
-      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      type: TLV.RESOURCE_TYPE.INTEGER,
       value: lifetime,
       permissions: 'RW',
     });
     // Default Minimum Period
     newServerObject.createResource({
       identifier: 2,
-      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      type: TLV.RESOURCE_TYPE.INTEGER,
       value: minimumPeriod,
       permissions: 'RW',
     });
     // Default Maximum Period
     newServerObject.createResource({
       identifier: 3,
-      type: Lwm2m.TLV.RESOURCE_TYPE.INTEGER,
+      type: TLV.RESOURCE_TYPE.INTEGER,
       value: maximumPeriod,
       permissions: 'RW',
     });
     // Notification Storing When Disabled or Offline
     newServerObject.createResource({
       identifier: 6,
-      type: Lwm2m.TLV.RESOURCE_TYPE.BOOLEAN,
+      type: TLV.RESOURCE_TYPE.BOOLEAN,
       value: true,
       permissions: 'RW',
     });
     // Binding
     newServerObject.createResource({
       identifier: 7,
-      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      type: TLV.RESOURCE_TYPE.STRING,
       value: bindingMode,
       permissions: 'RW',
     });
     // Registration Update Trigger
     newServerObject.createResource({
       identifier: 8,
-      type: Lwm2m.TLV.RESOURCE_TYPE.NONE,
+      type: TLV.RESOURCE_TYPE.NONE,
       value: () => {
         this.updateHandle();
       },
@@ -255,7 +325,7 @@ class ClientNodeInstance extends EventEmitter {
   }
 
   initiateAccessControlObject() {
-    const newAccessControlObject = this.createObjectInstance(2);
+    this.createObjectInstance(2);
   }
 
   initiateDeviceObject(manufacturer, model, queueMode) {
@@ -266,52 +336,46 @@ class ClientNodeInstance extends EventEmitter {
 
     newDeviceObject.createResource({
       identifier: 0,
-      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      type: TLV.RESOURCE_TYPE.STRING,
       value: manufacturer,
       permissions: 'R',
     });
     newDeviceObject.createResource({
       identifier: 1,
-      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      type: TLV.RESOURCE_TYPE.STRING,
       value: model,
       permissions: 'R',
     });
     newDeviceObject.createResource({
       identifier: 16,
-      type: Lwm2m.TLV.RESOURCE_TYPE.STRING,
+      type: TLV.RESOURCE_TYPE.STRING,
       value: bindingMode,
       permissions: 'R',
     });
   }
 
   initiateConnectivityMonitoringObject() {
-    const newConnectivityMonitoringObject = this.createObjectInstance(4);
+    this.createObjectInstance(4);
   }
 
   initiateFirmwareObject() {
-    const newFirmwareObject = this.createObjectInstance(5);
+    this.createObjectInstance(5);
   }
 
   initiateLocationObject() {
-    const newLocationObject = this.createObjectInstance(6);
+    this.createObjectInstance(6);
   }
 
   initiateConnectivityStatisticsObject() {
-    const newConnectivityStatisticsObject = this.createObjectInstance(7);
+    this.createObjectInstance(7);
   }
 
   requestGet(response, addressArray, observation) {
     let object;
-    let decodedObject
     let objectInstance;
-    let decodedObjectInstance
     let resource;
-    let decodedResource;
-    let resourceInstance;
-    let decodedResourceInstance;
-    let responsePayload;
 
-    response._packet.ack = true;
+    response._packet.ack = true; // eslint-disable-line no-underscore-dangle
 
     switch (addressArray.length) {
       case 1: {
@@ -321,10 +385,10 @@ class ClientNodeInstance extends EventEmitter {
           break;
         }
 
-        response.write(Lwm2m.TLV.encodeObject(object));
+        response.write(TLV.encodeObject(object));
         response.statusCode = '2.05';
         break;
-      } 
+      }
       case 2: {
         objectInstance = this.getObjectInstance(addressArray[0], addressArray[1]);
         if (objectInstance === undefined) {
@@ -332,10 +396,10 @@ class ClientNodeInstance extends EventEmitter {
           break;
         }
 
-        response.write(Lwm2m.TLV.encodeObjectInstance(objectInstance));
+        response.write(TLV.encodeObjectInstance(objectInstance));
         response.statusCode = '2.05';
         break;
-      } 
+      }
       case 3: {
         resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
         if (resource === undefined) {
@@ -343,10 +407,10 @@ class ClientNodeInstance extends EventEmitter {
           break;
         }
 
-        response.write(Lwm2m.TLV.encodeResource(resource));
+        response.write(TLV.encodeResource(resource));
         response.statusCode = '2.05';
         break;
-      } 
+      }
       case 4: {
         resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
         if (resource === undefined) {
@@ -354,7 +418,7 @@ class ClientNodeInstance extends EventEmitter {
           break;
         }
 
-        response.write(Lwm2m.TLV.encodeResourceInstance({
+        response.write(TLV.encodeResourceInstance({
           type: resource.type,
           identifier: addressArray[3],
           value: resource.value[addressArray[3]],
@@ -372,73 +436,13 @@ class ClientNodeInstance extends EventEmitter {
     }
   }
 
-  putResourceInstance(resource, description) {
-    if (!(resource instanceof Resource)) {
-      return '4.04'
-    }
-
-    if (!(resource.value instanceof Array)) {
-      return '4.04'
-    }
-
-    if (resource.value.length <= description.identifier) {
-      return '4.04'
-    }
-
-    if (resource.type !== description.type) {
-      throw Error('Resource type mismatch on write');
-    }
-
-    resource[description.identifier] = description.value;
-
-    return '2.04';
-  }
-
-  putResource(resource, description) {
-    if (!(resource instanceof Resource)) {
-      return '4.04'
-    }
-
-    if (resource.identifier !== description.identifier) {
-      throw Error('Resource identifier mismatch on write');
-    }
-
-    if (resource.type !== description.type) {
-      throw Error('Resource type mismatch on write');
-    }
-
-    return resource.writeValue(description.value);
-  }
-
-  putObjectInstance(objectInstance, description) {
-    let resource;
-    let responseCode;
-
-    if (!(objectInstance instanceof ObjectInstance)) {
-      return '4.04';
-    }
-
-    if (objectInstance.identifier !== description.identifier) {
-      throw Error('Object instance identifier mismatch on write');
-    }
-
-    for (let index = 0; index < objectInstance.resources.length; index += 1) {
-      resource = objectInstance.getResource(objectInstance.resources[index].identifier);
-
-      responseCode = putResource(resource, objectInstance.resources[index])
-      if (responseCode !== '2.04') {
-        return responseCode;
-      }
-    }
-    return '2.04'
-  }
 
   putObject(object, description) {
     let objectInstance;
     let responseCode;
 
     if (object === undefined) {
-      return '4.04'
+      return '4.04';
     }
 
     if (object.identifier !== description.identifier) {
@@ -447,66 +451,65 @@ class ClientNodeInstance extends EventEmitter {
 
     for (let index = 0; index < object.objectInstances.length; index += 1) {
       objectInstance = this.getObjectInstance(object.identifier, index);
-      responseCode = putObjectInstance(objectInstance, object.objectInstances[index])
+      responseCode = putObjectInstance(objectInstance, object.objectInstances[index]);
       if (responseCode !== '2.04') {
         return responseCode;
       }
     }
-    return '2.04'
+    return '2.04';
   }
 
   requestPut(response, addressArray, payload) {
     let object;
-    let decodedObject
+    let decodedObject;
     let objectInstance;
-    let decodedObjectInstance
+    let decodedObjectInstance;
     let resource;
     let decodedResource;
-    let resourceInstance;
     let decodedResourceInstance;
 
-    response._packet.ack = true;
+    response._packet.ack = true; // eslint-disable-line no-underscore-dangle
 
     switch (addressArray.length) {
       case 1: {
         object = this.getObject(addressArray[0]);
-        decodedObject = Lwm2m.TLV.decodeObject(payload, object);
+        decodedObject = TLV.decodeObject(payload, object);
 
         response.statusCode = this.putObject(object, decodedObject);
         break;
       }
       case 2: {
         objectInstance = this.getObjectInstance(addressArray[0], addressArray[1]);
-        decodedObjectInstance = Lwm2m.TLV.decodeObjectInstance(payload, objectInstance);
+        decodedObjectInstance = TLV.decodeObjectInstance(payload, objectInstance);
 
         response.statusCode = this.putObjectInstance(objectInstance, decodedObjectInstance);
         break;
       }
       case 3: {
         resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
-        decodedResource = Lwm2m.TLV.decodeResource(payload, resource);
+        decodedResource = TLV.decodeResource(payload, resource);
 
-        response.statusCode = this.putResource(resource, decodedResource);
+        response.statusCode = putResource(resource, decodedResource);
         break;
       }
       case 4: {
         resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
-        decodedResourceInstance = Lwm2m.TLV.decodeResourceInstance(payload, resource);
+        decodedResourceInstance = TLV.decodeResourceInstance(payload, resource);
 
-        response.statusCode = this.putResourceInstance(resource, decodedResourceInstance);
+        response.statusCode = putResourceInstance(resource, decodedResourceInstance);
         break;
       }
       default: {
         response.statusCode = '4.00';
       }
     }
-    response.end()
+    response.end();
   }
 
   requestPost(response, addressArray) {
     let resource;
 
-    response._packet.ack = true;
+    response._packet.ack = true; // eslint-disable-line no-underscore-dangle
 
     switch (addressArray.length) {
       case 1: {
@@ -531,12 +534,7 @@ class ClientNodeInstance extends EventEmitter {
         response.statusCode = '4.04';
       }
     }
-    response.end()
-  }
-
-  requestDelete(response, addressArray) {
-    // TODO: Add handles for resource deletion
-    response.end()
+    response.end();
   }
 
   getQueryString() {
@@ -579,12 +577,13 @@ class ClientNodeInstance extends EventEmitter {
 
       request.on('error', (error) => {
         // TODO: Parse errors and act accordingly
-        // failed(error);
-        failed('timeout');
+        this.emit('update-failed', error, updatesPath);
+        failed(error);
       });
+
       request.on('timeout', (error) => {
-        // failed(error);
-        failed('timeout');
+        this.emit('update-failed', error, updatesPath);
+        failed(error);
       });
 
       request.end();
@@ -594,10 +593,7 @@ class ClientNodeInstance extends EventEmitter {
   startUpdates(updatesPath) {
     this.coapServer.listen(this.listeningPort, () => {
       this.updatesIterator[updatesPath] = new Interval(() => {
-        this.update(updatesPath)
-        .catch((error) => {
-          this.emit('update-failed', error, updatesPath);
-        });
+        this.update(updatesPath);
       }, this.updatesInterval * 1000);
     });
   }
@@ -611,63 +607,61 @@ class ClientNodeInstance extends EventEmitter {
   }
 
   updateHandle(updatesPath) {
+    const updatedPaths = Object.keys(this.updatesIterator);
+    let path;
+
     if (updatesPath === undefined) {
-      for (let path in this.updatesIterator) {
+      for (let index = 0; index < updatedPaths.length; index += 1) {
+        path = updatedPaths[index];
+
         this.update(path)
-        .catch((error) => {
-          this.emit('update-failed', error, path);
-        });
+          .catch(this.updateFailed);
       }
     } else {
-      this.update(updatesPath)
-      .catch((error) => {
-        this.emit('update-failed', error, updatesPath);
-      });
+      this.update(updatesPath);
     }
   }
 
-  startObservation(addressArray, notification) {
-    const objectInstance = addressArray.slice(0, 2).join('/');
+  startObservation(addressArray, response) {
+    const notification = response;
     let resource;
 
-    notification._packet.ack = false;
-    notification._packet.confirmable = true;
+    notification._packet.ack = false; // eslint-disable-line no-underscore-dangle
+    notification._packet.confirmable = true; // eslint-disable-line no-underscore-dangle
 
-    notification.on('error', (error) => {
+    notification.on('error', () => {
       // TODO: Find better way to handle notification timeouts
       if (this.observedResources[addressArray.join('/')] !== undefined) {
         this.stopObservation(addressArray);
       }
-    })
+    });
 
     switch (addressArray.length) {
       case 1: {
         // TODO: Add handles for objects observation
         break;
-      } 
+      }
       case 2: {
         // TODO: Add handles for object instances observation
         break;
-      } 
+      }
       case 3: {
         resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
-
-        function changeListener() {
-          if (this.observedResources[addressArray.join('/')] instanceof Interval) {
-            this.observedResources[addressArray.join('/')].skip();
-          }
-        };
 
         if (
           this.observedResources[addressArray.join('/')] === undefined
           && resource instanceof Resource
         ) {
           this.observedResources[addressArray.join('/')] = new Interval(() => {
-            notification.write(Lwm2m.TLV.encodeResource(resource));
-          }, this.getResource(1, 0, 3).value * 1000 );
+            notification.write(TLV.encodeResource(resource));
+          }, this.getResource(1, 0, 3).value * 1000);
 
           if (resource.notifyOnChange) {
-            resource.on('change', changeListener);
+            resource.on('change', () => {
+              if (this.observedResources[addressArray.join('/')] instanceof Interval) {
+                this.observedResources[addressArray.join('/')].skip();
+              }
+            });
           }
         }
 
@@ -688,18 +682,16 @@ class ClientNodeInstance extends EventEmitter {
       case 1: {
         // TODO: Add handles for objects observation cancelling
         break;
-      } 
+      }
       case 2: {
         // TODO: Add handles for object instances observation cancelling
         break;
-      } 
+      }
       case 3: {
-        resource = this.getResource(addressArray[0], addressArray[1], addressArray[2]);
-
         this.observedResources[addressArray.join('/')].stop();
         delete this.observedResources[addressArray.join('/')];
         break;
-      } 
+      }
       case 4: {
         // TODO: Add handles for resource instances observation cancelling
         break;
@@ -711,8 +703,10 @@ class ClientNodeInstance extends EventEmitter {
   }
 
   stopObservations() {
-    for (var obs in this.observedResources) {
-      this.stopObservation(obs.split('/'));
+    const observedResources = Object.keys(this.observedResource);
+
+    for (let index = 0; index < observedResources.length; index += 1) {
+      this.stopObservation(observedResources[index].split('/'));
     }
   }
 
@@ -781,7 +775,7 @@ class ClientNodeInstance extends EventEmitter {
     this.on('state-change', (state) => {
       switch (state) {
         case 'not-registered': {
-          this.startRegistration()
+          this.startRegistration();
           break;
         }
         case 'stopped': {
@@ -805,39 +799,39 @@ class ClientNodeInstance extends EventEmitter {
   startRegistration(registrationPath = '/rd') {
     return new Promise((started, failed) => {
       this.register(registrationPath)
-      .then((updatesPath) => {
-        this.on('deregister', () => {
-          this.deregistrationHandle(updatesPath);
-        });
+        .then((updatesPath) => {
+          this.on('deregister', () => {
+            this.deregistrationHandle(updatesPath);
+          });
 
-        this.on('update-failed', (reason) => {
-          if ((reason === '4.04') || (reason === 'timeout')) {
-            this.stopUpdates(updatesPath);
-            this.state = 'not-registered';
+          this.on('update-failed', (reason) => {
+            if ((reason === '4.04') || (reason === 'timeout')) {
+              this.stopUpdates(updatesPath);
+              this.state = 'not-registered';
+            }
+          });
+
+          this.startUpdates(updatesPath);
+          started(updatesPath);
+        })
+        .catch((responseCode) => {
+          switch (responseCode) {
+            case '4.00':
+            case '4.03':
+            case '4.12':
+              this.state = 'stopped';
+              failed(responseCode);
+              break;
+            default:
+              setTimeout(() => {
+                this.startRegistration(registrationPath)
+                  .then(started)
+                  .catch((error) => {
+                    this.emit('error', error);
+                  });
+              }, this.getResource(1, 0, 1).value);
           }
         });
-
-        this.startUpdates(updatesPath);
-        started(updatesPath);
-      })
-      .catch((responseCode) => {
-        switch (responseCode) {
-          case '4.00':
-          case '4.03':
-          case '4.12':
-            this.state = 'stopped';
-            failed(responseCode);
-            break;
-          default:
-            setTimeout(() => {
-              this.startRegistration(registrationPath)
-              .then(started)
-              .catch((error) => {
-                this.emit('error', error);
-              });
-            }, this.getResource(1, 0, 1).value);
-        }
-      });
     });
   }
 
@@ -860,7 +854,7 @@ class ClientNodeInstance extends EventEmitter {
     switch (request.method) {
       case 'GET': {
         response.setOption('Content-Format', 'application/vnd.oma.lwm2m+tlv');
-        this.requestGet(response, addressArray, request.headers['Observe']);
+        this.requestGet(response, addressArray, request.headers.Observe);
         break;
       }
       case 'PUT': {
@@ -871,18 +865,14 @@ class ClientNodeInstance extends EventEmitter {
         this.requestPost(response, addressArray);
         break;
       }
-      case 'DELETE': {
-        this.requestDelete(response, addressArray);
-        break;
-      }
       default: {
         // TODO: Implement switch statement default case
       }
     }
 
-    if (request.headers['Observe'] === 0) {
+    if (request.headers.Observe === 0) {
       this.startObservation(addressArray, response);
-    } else if (request.headers['Observe'] === 1) {
+    } else if (request.headers.Observe === 1) {
       this.stopObservation(addressArray);
     }
   }
