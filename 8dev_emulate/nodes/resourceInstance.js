@@ -1,17 +1,4 @@
-'use strict';
-
 const EventEmitter = require('events');
-const Lwm2m = require('../../lwm2m/index.js');
-const RESOURCE_TYPE = Lwm2m.TLV.RESOURCE_TYPE;
-
-function hexBuffer(hexadecimalString) {
-  let hexString = '';
-  if (hexadecimalString.length % 2 === 1) {
-    hexString += '0';
-  }
-  hexString += hexadecimalString;
-  return Buffer.from(hexString, 'hex');
-}
 
 class Resource extends EventEmitter {
   constructor(description) {
@@ -19,7 +6,7 @@ class Resource extends EventEmitter {
 
     this.identifier = description.identifier;
     this.type = description.type;
-    this._value = description.value;
+    this._value = description.value; // eslint-disable-line no-underscore-dangle
     this.handle = description.handle;
     this.permissions = description.permissions;
     this.notifyOnChange = description.notifyOnChange;
@@ -28,23 +15,15 @@ class Resource extends EventEmitter {
     }, 100);
   }
 
-  get value() { return this._value; }
+  get value() { return this._value; } // eslint-disable-line no-underscore-dangle
 
   set value(value) {
     // TODO: throw exception if value type is incorrect
 
-    if (this._value != value) {
-      this._value = value;
+    if (this._value !== value) { // eslint-disable-line no-underscore-dangle
+      this._value = value; // eslint-disable-line no-underscore-dangle
       this.emit('change', value);
     }
-  }
-
-  readValue(callback) {
-    if (this.permissions.indexOf('R') > -1) {
-      this.value;
-      return '2.05';
-    }
-    return '4.05';
   }
 
   writeValue(value, force) {
