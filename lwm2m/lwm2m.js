@@ -59,7 +59,7 @@ function changeBufferSize(buffer, start, end = buffer.length) {
   return Buffer.from(bufferArray);
 }
 
-function findDictionaryByValue(dictionaryList, keyName, value) {
+function getDictionaryByValue(dictionaryList, keyName, value) {
   return dictionaryList.find(dictionary => (dictionary[keyName] === value));
 }
 
@@ -415,7 +415,7 @@ function decodeObjectInstanceTLV(buffer, objectInstance) {
     remainingBuffer = changeBufferSize(decodedObjectInstance.value, index);
     resourceIdentifier = decodeTLV(remainingBuffer).identifier;
 
-    resourceDescription = findDictionaryByValue(objectInstance.resources, 'identifier', resourceIdentifier);
+    resourceDescription = getDictionaryByValue(objectInstance.resources, 'identifier', resourceIdentifier);
 
     if (resourceDescription === undefined) {
       throw Error(`No resource description found (x/${objectInstance.identifier}/${resourceIdentifier})`);
@@ -445,7 +445,7 @@ function decodeObjectTLV(buffer, object) {
     remainingBuffer = changeBufferSize(buffer, index);
     objectInstanceIdentifier = decodeTLV(remainingBuffer).identifier;
 
-    objectInstanceDescription = findDictionaryByValue(object.objectInstances, 'identifier', objectInstanceIdentifier);
+    objectInstanceDescription = getDictionaryByValue(object.objectInstances, 'identifier', objectInstanceIdentifier);
 
     if (objectInstanceDescription === undefined) {
       throw Error(`No object instance description found (/${object.identifier}/${objectInstanceIdentifier})`);
@@ -465,7 +465,7 @@ function decodeObjectTLV(buffer, object) {
 module.exports = {
   TYPE,
   RESOURCE_TYPE,
-  findDictionaryByValue,
+  getDictionaryByValue,
   encodeTLV,
   decodeTLV,
   encodeResourceValue,
