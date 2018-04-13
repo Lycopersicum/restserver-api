@@ -1,8 +1,7 @@
-'use strict';
-
 const ClientNode = require('./clientNodeInstance.js');
-const Lwm2m = require('../../lwm2m/index.js');
-const RESOURCE_TYPE = Lwm2m.TLV.RESOURCE_TYPE;
+const { TLV } = require('../../lwm2m/index.js');
+
+const { RESOURCE_TYPE } = TLV;
 
 function randomFloat(min, max) {
   return (Math.random() * (max - min)) + min;
@@ -34,7 +33,6 @@ function humiditySensorHandle(averageHumidity = 70, fluctuation = 0.05) {
   return randomFloat(fluctuationMin, fluctuationMax);
 }
 
-
 class Sensor3700 extends ClientNode {
   constructor(lifetime, UUID, serverIP, clientPort) {
     super(lifetime, '8devices', '8dev_3700', true, UUID, serverIP, clientPort);
@@ -54,7 +52,7 @@ class Sensor3700 extends ClientNode {
       permissions: 'R',
       type: RESOURCE_TYPE.INTEGER,
       value: 3300,
-      handle: powerSourceVoltageHandle
+      handle: powerSourceVoltageHandle,
     });
   }
 
@@ -66,9 +64,7 @@ class Sensor3700 extends ClientNode {
       permissions: 'R',
       type: RESOURCE_TYPE.FLOAT,
       value: 0.0,
-      handle: () => {
-        return this.instantaneousActivePowerHandle();
-      },
+      handle: () => this.instantaneousActivePowerHandle(),
     });
 
     this.activeEnergy = powerMeasurementObject.createResource({
@@ -83,9 +79,7 @@ class Sensor3700 extends ClientNode {
       permissions: 'R',
       type: RESOURCE_TYPE.FLOAT,
       value: 0.0,
-      handle: () => {
-        return this.instantaneousReactivePowerHandle();
-      },
+      handle: () => this.instantaneousReactivePowerHandle(),
     });
 
     this.reactiveEnergy = powerMeasurementObject.createResource({
@@ -96,15 +90,17 @@ class Sensor3700 extends ClientNode {
     });
 
     this.activePower.on('change', (currentActivePower) => {
-      const cumulativeActivePower = this.activeEnergy.value;
-        this.activeEnergy.value =
-            (currentActivePower/36000 + this.activeEnergy.value) & 0x7FFFFFFF; // eslint-disable-line no-bitwise
+      this.activeEnergy.value = ( // eslint-disable-line no-bitwise
+        (currentActivePower / 36000)
+        + this.activeEnergy.value
+      ) & 0x7FFFFFFF;
     });
 
     this.reactivePower.on('change', (currentReactivePower) => {
-      const cumulativeReactivePower = this.reactiveEnergy.value;
-        this.reactiveEnergy.value =
-            (currentReactivePower/36000 + this.reactiveEnergy.value) & 0x7FFFFFFF; // eslint-disable-line no-bitwise
+      this.reactiveEnergy.value = ( // eslint-disable-line no-bitwise
+        (currentReactivePower / 36000)
+        + this.reactiveEnergy.value
+      ) & 0x7FFFFFFF;
     });
   }
 
@@ -121,24 +117,22 @@ class Sensor3700 extends ClientNode {
   }
 
   instantaneousActivePowerHandle() {
-    let timeNow;
+    const timeNow = new Date().getTime() - this.timeInitialisation;
 
     if (this.relayState.value === false) {
       return 0;
     }
 
-    timeNow = new Date().getTime() - this.timeInitialisation;
     return Math.abs(Math.cos(timeNow) * 1000 * Math.cos(timeNow / 20000));
   }
 
   instantaneousReactivePowerHandle() {
-    let timeNow;
+    const timeNow = new Date().getTime() - this.timeInitialisation;
 
     if (this.relayState.value === false) {
       return 0;
     }
 
-    timeNow = new Date().getTime() - this.timeInitialisation;
     return Math.abs(Math.sin(timeNow) * 400 * Math.cos(timeNow / 20000));
   }
 }
@@ -160,14 +154,14 @@ class Sensor3800 extends ClientNode {
       permissions: 'R',
       type: RESOURCE_TYPE.INTEGER,
       value: 3300,
-      handle: powerSourceVoltageHandle
+      handle: powerSourceVoltageHandle,
     });
   }
 
   initialiseTemperatureSensorObject() {
     const digitalInputObject = this.createObjectInstance(3303);
 
-    const temperatureSensorResource = digitalInputObject.createResource({
+    digitalInputObject.createResource({
       identifier: 5700,
       permissions: 'R',
       type: RESOURCE_TYPE.FLOAT,
@@ -179,7 +173,7 @@ class Sensor3800 extends ClientNode {
   initialiseHumiditySensorObject() {
     const digitalInputObject = this.createObjectInstance(3304);
 
-    const temperatureSensorResource = digitalInputObject.createResource({
+    digitalInputObject.createResource({
       identifier: 5700,
       permissions: 'R',
       type: RESOURCE_TYPE.FLOAT,
@@ -214,7 +208,7 @@ class Sensor4400 extends ClientNode {
       permissions: 'R',
       type: RESOURCE_TYPE.INTEGER,
       value: 3300,
-      handle: powerSourceVoltageHandle
+      handle: powerSourceVoltageHandle,
     });
   }
 
@@ -239,14 +233,14 @@ class Sensor4400 extends ClientNode {
 
     this.hallSensorState.on('change', () => {
       this.hallSensorCounter.value =
-          (this.hallSensorCounter.value + 1) & 0x7FFFFFFF // eslint-disable-line no-bitwise
+          (this.hallSensorCounter.value + 1) & 0x7FFFFFFF; // eslint-disable-line no-bitwise
     });
   }
 
   initialiseTemperatureSensorObject() {
     const digitalInputObject = this.createObjectInstance(3303);
 
-    const temperatureSensorResource = digitalInputObject.createResource({
+    digitalInputObject.createResource({
       identifier: 5700,
       permissions: 'R',
       type: RESOURCE_TYPE.FLOAT,
@@ -272,7 +266,7 @@ class Sensor4500 extends ClientNode {
       permissions: 'R',
       type: RESOURCE_TYPE.INTEGER,
       value: 3300,
-      handle: powerSourceVoltageHandle
+      handle: powerSourceVoltageHandle,
     });
   }
 
