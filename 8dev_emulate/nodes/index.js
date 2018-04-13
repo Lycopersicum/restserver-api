@@ -1,5 +1,3 @@
-'use strict';
-
 const client = require('./clientNodeInstance.js');
 const resource = require('./resourceInstance.js');
 
