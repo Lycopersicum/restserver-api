@@ -348,7 +348,7 @@ function decodeResourceInstanceTLV(buffer, resources) {
   const decodedResourceInstance = decodeTLV(buffer);
 
   if (decodedResourceInstance.type !== TYPE.RESOURCE_INSTANCE) {
-    throw Error('Decoded resource TLV identifier and description identifiers do not match');
+    throw Error('Decoded resource TLV type is not resource instance');
   }
 
   return {
@@ -363,7 +363,7 @@ function decodeResourceInstanceValue(buffer, resourceInstance) {
   const decodedResourceInstance = decodeTLV(buffer);
 
   if (decodedResourceInstance.type !== TYPE.RESOURCE_INSTANCE) {
-    throw Error('Decoded resource TLV identifier and description identifiers do not match');
+    throw Error('Decoded resource TLV type is not resource instance');
   }
 
   return {
