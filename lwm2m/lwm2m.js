@@ -380,7 +380,7 @@ function decodeMultipleResourceInstancesTLV(buffer, resources) {
   while (index < buffer.length) {
     decodedResourceInstance = decodeResourceInstanceValue(
       changeBufferSize(buffer, index),
-      resources // eslint-disable-line comma-dangle
+      resources
     );
     decodedResourceValues.push(decodedResourceInstance.value);
     index += decodedResourceInstance.tlvSize;
